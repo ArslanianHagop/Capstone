@@ -1,0 +1,112 @@
+﻿@page "/admin/languages"
+@inject ILanguageService LanguageService
+@attribute [Authorize(Roles = "Admin")]
+@implements IDisposable
+
+<PageTitle>Languages</PageTitle>
+
+<h3>Languages</h3>
+
+<div class="header">
+	<div class="col">Name</div>
+	<div class="col">Visible</div>
+	<div class="col"></div>
+</div>
+
+@if(LanguageService.AdminLanguages != null && LanguageService.AdminLanguages.Count != 0)
+{
+	@foreach (var language in LanguageService.AdminLanguages)
+	{
+		@if (language.Editing)
+		{
+			<EditForm Model="editingLanguage" OnSubmit="UpdateLanguage">
+				<div class="row">
+					<div class="col">
+						<InputText @bind-Value="editingLanguage.Name" class="form-control"></InputText>
+					</div>
+					<div class="col col-visible">
+						<InputCheckbox @bind-Value="editingLanguage.Visible" style="transform: scale(1.5,1.5);"></InputCheckbox>
+					</div>
+					<div class="col">
+						<button type="submit" class="btn btn-primary">
+							<i class="oi oi-cloud-upload"></i>
+						</button>
+						<button class="btn btn-primary" @onclick="CancelEditing">
+							<i class="oi oi-circle-x"></i>
+						</button>
+					</div>
+				</div>
+			</EditForm>
+		}
+		else
+		{
+			<div class="row">
+				<div class="col">
+					@language.Name
+				</div>
+				<div class="col col-visible">
+					<span>@(language.Visible ? "✔️" : "")</span>
+				</div>
+				<div class="col">
+					<button class="btn btn-primary" @onclick="(() => EditLanguage(language))">
+						<i class="oi oi-pencil"></i>
+					</button>
+					<button class="btn btn-primary" @onclick="(() => DeleteLanguage(language.Id))">
+						<i class="oi oi-trash"></i>
+					</button>
+				</div>
+			</div>
+		}
+	}
+}
+<button class="btn btn-primary" @onclick="CreateNewLanguage">
+	<i class="oi oi-plus"></i> Add new Interest
+</button>
+
+@code {
+	Language editingLanguage = null;
+
+	protected override async Task OnInitializedAsync()
+	{
+		await LanguageService.GetAdminLanguages();
+		LanguageService.OnChange += StateHasChanged;
+	}
+
+	public void Dispose()
+	{
+		LanguageService.OnChange -= StateHasChanged;
+	}
+
+	private void CreateNewLanguage()
+	{
+		editingLanguage = LanguageService.CreateNewLanguage();
+	}
+
+	private void EditLanguage(Language language)
+	{
+		language.Editing = true;
+		editingLanguage = language;
+	} 
+
+	private async Task UpdateLanguage()
+	{
+		if (editingLanguage.IsNew)
+			await LanguageService.AddLanguage(editingLanguage);
+		else
+			await LanguageService.UpdateLanguage(editingLanguage);
+
+
+		editingLanguage = new Language();
+	}
+
+	private async Task CancelEditing()
+	{
+		editingLanguage = new Language();
+		await LanguageService.GetAdminLanguages();
+	}
+
+	private async Task DeleteLanguage(int id)
+	{
+		await LanguageService.DeleteLanguage(id);
+	}
+}

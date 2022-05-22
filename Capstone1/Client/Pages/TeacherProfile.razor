@@ -1,0 +1,480 @@
+﻿@page "/profile/teacher/{page:int}"
+@inject IAuthService AuthService
+@inject ITeacherService TeacherService
+@inject IInterestService InterestService
+@inject IProposalService ProposalService
+@inject IPostService PostService
+@inject NavigationManager NavigationManager
+@attribute [Authorize(Roles = "Teacher")]
+
+<PageTitle>Edit Teacher Profile</PageTitle>
+
+<button class="float-end btn btn-primary" @onclick="GoToMessageAdmin">Message the admin with your recommendations</button>
+<EditForm Model="teacher" OnValidSubmit="ChangeInterests">
+	<DataAnnotationsValidator></DataAnnotationsValidator>
+	@if(teacher.TeacherInterests != null && teacher.TeacherInterests.Count > 0)
+	{
+		@foreach (var teacherInterest in teacher.TeacherInterests)
+		{
+			<div class="row">
+				<div class="col mb-3">
+					<InputSelect @bind-Value="teacherInterest.InterestId" class="form-control">
+						@foreach (var interest in InterestService.Interests)
+						{
+							<option value="@interest.Id.ToString()">@interest.Name</option>
+						}
+					</InputSelect>
+				</div>
+				<div class="col mb-3">
+					<button type="button" class="btn btn-primary" @onclick="(() => RemoveInterest(teacherInterest.InterestId))">
+						<i class="oi oi-trash"></i>
+					</button>
+				</div>
+			</div>
+		}
+	}
+	<button type="button" class="btn btn-primary" @onclick="AddInterest">
+		<i class="oi oi-plus"></i> Add Interest
+	</button>
+	<br />
+	<br />
+	<button type="submit" class="btn btn-primary">Update Interests</button>
+	<div class="@messageCssClass">
+		<span>@message</span>
+	</div>
+	<hr />
+</EditForm>
+<h3>Teacher Background</h3>
+
+<div class="header">
+	<div class="col">Position</div>
+	<div class="col">Company Name</div>
+	<div class="col">From-Month</div>
+	<div class="col">From-Year</div>
+	<div class="col">To-Month</div>
+	<div class="col">To-Year</div>
+	<div class="col"></div>
+</div>
+
+@if(TeacherService.LoggedInTeachersJobs != null && TeacherService.LoggedInTeachersJobs.Count > 0)
+{
+	@foreach (var teacherJob in TeacherService.LoggedInTeachersJobs)
+	{
+		@if (teacherJob.Editing)
+		{
+			<EditForm Model="editingTeacherJob" OnValidSubmit="AddOrUpdateTeacherJob">
+				<div class="row">
+					<div class="col">
+						<InputText @bind-Value="editingTeacherJob.Position" class="form-control"></InputText>
+					</div>
+					<div class="col">
+						<InputText @bind-Value="editingTeacherJob.CompanyName" class="form-control"></InputText>
+					</div>
+					<div class="col mb-3">
+						<InputSelect @bind-Value="editingTeacherJob.FromMonth" class="form-control">
+							@foreach (var month in months)
+							{
+								<option value="@month.ToString()">@month</option>
+							}
+						</InputSelect>
+					</div>
+					<div class="col mb-3">
+						<InputSelect @bind-Value="editingTeacherJob.FromYear" class="form-control">
+							@foreach (var year in years)
+							{
+								<option value="@year.ToString()">@year</option>
+							}
+						</InputSelect>
+					</div>
+					<div class="col mb-3">
+						<InputSelect @bind-Value="editingTeacherJob.ToMonth" class="form-control">
+							@foreach (var month in toMonths)
+							{
+								<option value="@month.ToString()">@month</option>
+							}
+						</InputSelect>
+					</div>
+					<div class="col mb-3">
+						<InputSelect @bind-Value="editingTeacherJob.ToYear" class="form-control">
+							@foreach (var year in toYears)
+							{
+								<option value="@year.ToString()">@year</option>
+							}
+						</InputSelect>
+					</div>
+					<div class="col">
+						<button type="submit" class="btn btn-primary">
+							<i class="oi oi-cloud-upload"></i>
+						</button>
+						<button class="btn btn-primary" @onclick="CancelEditing">
+							<i class="oi oi-circle-x"></i>
+						</button>
+					</div>
+				</div>
+			</EditForm>
+		}
+		else
+		{
+			<div class="row">
+				<div class="col">
+					@teacherJob.Position
+				</div>
+				<div class="col">
+					@teacherJob.CompanyName
+				</div>
+				<div class="col">
+					@teacherJob.FromMonth
+				</div>
+				<div class="col">
+					@teacherJob.FromYear
+				</div>
+				<div class="col">
+					@teacherJob.ToMonth
+				</div>
+				<div class="col">
+					@teacherJob.ToYear
+				</div>
+				<div class="col">
+					<button class="btn btn-primary" @onclick="(() => EditTeacherJob(teacherJob))">
+						<i class="oi oi-pencil"></i>
+					</button>
+					<button class="btn btn-primary" @onclick="(() => DeleteTeacherJob(teacherJob.Id))">
+						<i class="oi oi-trash"></i>
+					</button>
+				</div>
+			</div>
+		}
+	}
+}
+<button class="btn btn-primary" @onclick="CreateNewTeacherJob">
+	<i class="oi oi-plus"></i> Add new Job
+</button>
+
+<br />
+<br />
+<hr />
+<br />
+
+<div class="header">
+	<div class="col">Name</div>
+	<div class="col">Topics</div>
+	<div class="col">Link</div>
+	<div class="col"></div>
+</div>
+
+@if(TeacherService.LoggedInTeachersCourses != null && TeacherService.LoggedInTeachersCourses.Count > 0)
+{
+	@foreach (var teacherCourse in TeacherService.LoggedInTeachersCourses)
+	{
+		if (teacherCourse.Editing)
+		{
+			<EditForm Model="editingTeacherCourse" OnValidSubmit="AddOrUpdateTeacherCourse">
+				<div class="row">
+					<div class="col">
+						<InputText @bind-Value="editingTeacherCourse.Name" class="form-control"></InputText>
+					</div>
+					<div class="col">
+						@if(teacherCourse.TeacherCourseInterests != null && teacherCourse.TeacherCourseInterests.Count > 0)
+						{
+							@foreach (var teacherCourseInterest in teacherCourse.TeacherCourseInterests)
+							{
+								 <div class="row">
+									<div class="col">
+									   <InputSelect @bind-Value="teacherCourseInterest.InterestId" class="form-control">
+										   @foreach (var interest in InterestService.Interests)
+										  {
+											  <option value="@interest.Id.ToString()">@interest.Name</option>
+										  }
+									   </InputSelect>
+									</div>
+									<div class="col">
+									   <button type="button" class="btn btn-primary" @onclick="(() => RemoveTeacherCourseInterest(teacherCourseInterest.InterestId))">
+										   <i class="oi oi-trash"></i>
+									   </button>
+									</div>
+								</div>
+							}
+						}
+					   <button type="button" class="btn btn-primary" @onclick="AddTeacherCourseInterest">
+						   <i class="oi oi-plus"></i> Add Topic
+					   </button>
+					</div>
+					<div class="col">
+						<InputText @bind-Value="editingTeacherCourse.CourseLink" class="form-control"></InputText>
+					</div>
+					<div class="col">
+						<button type="submit" class="btn btn-primary">
+							<i class="oi oi-cloud-upload"></i>
+						</button>
+						<button class="btn btn-primary" @onclick="CancelEditingTeacherCourse">
+							<i class="oi oi-circle-x"></i>
+						</button>
+					</div>
+				</div>
+			</EditForm>
+		}
+		else
+		{
+			<div class="row">
+				<div class="col">
+					@teacherCourse.Name
+				</div>
+				<div class="col">
+					@if(teacherCourseInterests != null && teacherCourseInterests.Count > 0)
+					{
+						@foreach (var teacherCourseInterest in teacherCourseInterests.Where(tci => tci.TeacherCourseId == teacherCourse.Id))
+					   {
+						   <span>@InterestService.Interests.Find(i => i.Id == teacherCourseInterest.InterestId).Name</span>
+						   <br />
+					   }
+					}
+				</div>
+				<div class="col">
+					@teacherCourse.CourseLink
+				</div>
+				<div class="col">
+					<button class="btn btn-primary" @onclick="(() => EditTeacherCourse(teacherCourse))">
+						<i class="oi oi-pencil"></i>
+					</button>
+					<button class="btn btn-primary" @onclick="(() => DeleteTeacherCourse(teacherCourse.Id))">
+						<i class="oi oi-trash"></i>
+					</button>
+				</div>
+			</div>
+		}
+	}
+}
+
+<button class="btn btn-primary" @onclick="CreateNewTeacherCourse">
+	<i class="oi oi-plus"></i> Add new Course
+</button>
+
+<br />
+<br />
+<hr />
+<br />
+
+
+<table class="table">
+	<thead>
+		<tr>
+			<th>Post Title</th>
+			<th>Poster</th>
+			<th>Post Budget</th>
+			<th>Proposal Budget</th>
+			<th>Edit?</th>
+		</tr>
+	</thead>
+	<tbody>
+		@if(proposals != null && proposals.Count > 0)
+		{
+			<Virtualize Items="proposals" Context="proposal">
+				<tr style="background-color: @(proposal.IsAccepted ? "lightgreen" : "white")">
+					<td>@posts.FirstOrDefault(p => p.Id == proposal.PostId).Title</td>
+					<td>@fullNames[proposal.PostId]</td>
+					<td>@posts.FirstOrDefault(p => p.Id == proposal.PostId).Budget$/1hr</td>
+					<td>@proposal.Budget$/1hr</td>
+					<td>
+						@if(!proposal.IsAccepted)
+						{
+							<button class="btn btn-primary" @onclick="(() => EditProposal(proposal.PostId, proposal.Id))">
+								<i class="oi oi-pencil"></i>
+							</button>
+						}
+					</td>
+				</tr>
+			</Virtualize>
+		}
+	</tbody>
+</table>
+
+<div class="float-end">
+	@for (var i = 1; i <= Math.Ceiling((double)proposalsCount / 5); i++)
+	{
+		<a class="btn @(i == Page ? "btn-info" : "btn-outline-info") page-selection"
+					href=@ProposalsPagination(i)>@i</a>
+	}
+</div>
+
+
+@code {
+
+	[Parameter]
+	public int Page { get; set; } = 1;
+
+	Teacher teacher = new Teacher();
+	TeacherJob editingTeacherJob = new TeacherJob();
+	TeacherCourse editingTeacherCourse = new TeacherCourse();
+	List<TeacherCourseInterest> teacherCourseInterests = new List<TeacherCourseInterest>();
+	List<Post> posts = new List<Post>();
+	Dictionary<int, string> fullNames = new Dictionary<int, string>();
+	List<Proposal> proposals = new List<Proposal>();
+	int proposalsCount = 0;
+	List<string> months = new List<string>
+	{
+		"January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"
+	};
+	List<string> years = new List<string>();
+	List<string> toMonths = new List<string>();
+	List<string> toYears = new List<string>();
+	string message = string.Empty;
+	string messageCssClass = string.Empty;
+
+	protected override async Task OnInitializedAsync()
+	{
+		proposalsCount = await ProposalService.GetLoggedInTeachersProposalsCount();
+		await InterestService.GetInterests();
+		teacher.TeacherInterests = await TeacherService.GetLoggedInTeachersInterests();
+		await TeacherService.GetLoggedInTeachersJobs();
+		await TeacherService.GetLoggedInTeachersCourses();
+		teacherCourseInterests = await TeacherService.GetAllTeacherCourseInterests();
+		posts = await PostService.GetAllPostsWithAccepted();
+		for (var i = 1950; i <= (int)DateTime.Now.Year; i++)
+		{
+			years.Add(i.ToString());
+		}
+		toMonths.AddRange(months);
+		toMonths.Add("Present");
+		toYears.AddRange(years);
+		toYears.Add("Present");
+	}
+
+	protected override async Task OnParametersSetAsync()
+	{
+		proposals = await ProposalService.GetLoggedInTeachersProposalsPaginated(Page);
+		if(proposals != null && proposals.Count > 0)
+		{
+			foreach (var proposal in proposals)
+			{
+				if(!fullNames.ContainsKey(proposal.PostId))
+					fullNames.Add(proposal.PostId, await PostService.GetNameOfPosterByPostId(proposal.PostId));
+			}
+		}
+	}
+
+
+	string ProposalsPagination(int i)
+	{
+		return $"profile/teacher/{i}";
+	}
+
+
+	async Task ChangeInterests()
+	{
+		var result = await TeacherService.ChangeInterests(teacher);
+		message = result.Message;
+		if (result.Success)
+			messageCssClass = "text-success";
+		else
+			messageCssClass = "text-danger";
+		StateHasChanged();
+	}
+
+	void RemoveInterest(int interestId)
+	{
+		var interest = teacher.TeacherInterests.Find(ti => ti.InterestId == interestId);
+		if(interest == null)
+		{
+			return;
+		}
+
+		teacher.TeacherInterests.Remove(interest);
+	}
+
+	void RemoveTeacherCourseInterest(int interestId)
+	{
+		var interest = editingTeacherCourse.TeacherCourseInterests.Find(tci => tci.InterestId == interestId);
+		if(interest == null)
+		{
+			return;
+		}
+
+		editingTeacherCourse.TeacherCourseInterests.Remove(interest);
+	}
+
+	void AddInterest()
+	{
+		teacher.TeacherInterests.Add(new TeacherInterest { });
+	}
+
+	void AddTeacherCourseInterest()
+	{
+		editingTeacherCourse.TeacherCourseInterests.Add(new TeacherCourseInterest { });
+	}
+
+	private void CreateNewTeacherJob()
+	{
+		editingTeacherJob = TeacherService.CreateNewTeacherJob();
+	}
+
+	private void CreateNewTeacherCourse()
+	{
+		editingTeacherCourse = TeacherService.CreateNewTeacherCourse();
+	}
+
+	private void EditTeacherJob(TeacherJob teacherJob)
+	{
+		teacherJob.Editing = true;
+		editingTeacherJob = teacherJob;
+	}
+
+	private void EditTeacherCourse(TeacherCourse teacherCourse)
+	{
+		teacherCourse.Editing = true;
+		teacherCourse.TeacherCourseInterests = teacherCourseInterests.Where(tci => tci.TeacherCourseId == teacherCourse.Id).ToList();
+		editingTeacherCourse = teacherCourse;
+	}
+
+	private async Task AddOrUpdateTeacherJob()
+	{
+		if (editingTeacherJob.IsNew)
+			await TeacherService.AddTeacherJob(editingTeacherJob);
+		else
+			await TeacherService.UpdateTeacherJob(editingTeacherJob);
+
+		editingTeacherJob = new TeacherJob();
+	}
+
+	private async Task AddOrUpdateTeacherCourse()
+	{
+		if (editingTeacherCourse.IsNew)
+			await TeacherService.AddTeacherCourse(editingTeacherCourse);
+		else
+			await TeacherService.UpdateTeacherCourse(editingTeacherCourse);
+
+		teacherCourseInterests = await TeacherService.GetAllTeacherCourseInterests();
+		editingTeacherCourse = new TeacherCourse();
+	}
+
+	private async Task CancelEditing()
+	{
+		editingTeacherJob = new TeacherJob();
+		await TeacherService.GetLoggedInTeachersJobs();
+	}
+
+	private async Task CancelEditingTeacherCourse()
+	{
+		editingTeacherCourse = new TeacherCourse();
+		await TeacherService.GetLoggedInTeachersCourses();
+	}
+
+	private async Task DeleteTeacherJob(int id)
+	{
+		await TeacherService.DeleteTeacherJob(id);
+	}
+
+	private async Task DeleteTeacherCourse(int id)
+	{
+		await TeacherService.DeleteTeacherCourse(id);
+	}
+
+	private void EditProposal(int postId, int proposalId)
+	{
+		NavigationManager.NavigateTo($"/Proposal/{postId}/{proposalId}");
+	}
+
+	private async Task GoToMessageAdmin()
+	{
+		NavigationManager.NavigateTo($"/message/{await AuthService.GetFirstAdminId()}");
+	}
+}

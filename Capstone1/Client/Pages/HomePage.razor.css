@@ -1,0 +1,149 @@
+﻿body {
+}
+
+* {
+    padding: 0;
+    margin: 0;
+    box-sizing: border-box;
+    text-decoration: none;
+    list-style: none;
+    font-family: 'Poppins', sans-serif;
+    font-weight: bold;
+}
+
+.home {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 100%;
+    background-color: #EDEDED;
+    overflow-y: scroll;
+}
+
+.logo {
+    display: inline-block;
+    font-size: 2rem;
+    padding: 3rem 0 0 4rem;
+    color: var(--color-primary);
+}
+
+nav a.nav-home {
+    color: var(--color-primary);
+}
+
+nav a {
+    color: var(--nav-color);
+}
+
+nav ul {
+    margin-left: 10rem;
+}
+
+nav button {
+    float: right;
+    margin-right: 10px;
+}
+
+nav ul li {
+    display: inline;
+    line-height: 3rem;
+    padding: 20px;
+}
+
+.nav-menu {
+    display: inline-block;
+}
+
+
+button.Login {
+    width: 130px;
+    background-color: var(--color-primary);
+    border: none;
+    outline: none;
+    height: 40px;
+    border-radius: 49px;
+    color: #fff;
+    text-transform: uppercase;
+    font-size: 15px;
+    font-weight: 600;
+    margin: 3.5rem 3rem 0 0;
+    cursor: pointer;
+    transition: 0.5s;
+}
+
+    button.Login:hover {
+        background-color: var(--color-secondary);
+    }
+
+button.signup {
+    width: 100px;
+    border: none;
+    outline: none;
+    height: 40px;
+    border-radius: 49px;
+    color: var(--color-primary);
+    text-transform: uppercase;
+    font-size: 15px;
+    font-weight: 600;
+    margin: 3.5rem 0 0 0;
+    cursor: pointer;
+    transition: 0.5s;
+}
+
+    button.signup:hover {
+        color: var(--color-secondary);
+    }
+
+.user-button {
+    display: inline-block;
+    margin-left: -20px;
+}
+
+.content {
+    margin-top: 5%;
+    text-align: center;
+}
+
+    .content h1 {
+        font-size: 60px;
+    }
+
+.carousel {
+    display: flex; 
+    justify-content: center; 
+    align-items: center;
+    margin-top: 5%;
+}
+
+
+.container {
+    margin: 2rem auto;
+    width: 80%;
+}
+
+.post {
+    display: flex;
+    box-shadow: 0 0 2.5rem rgb(0, 0, 0, 0.28);
+    border-radius: 10px;
+    padding: 2rem;
+    text-align: center;
+}
+
+
+.teacher-image {
+    border-radius: 50%;
+    height: 120px;
+    margin: auto;
+    flex-direction: column;
+}
+
+.contents{
+    margin: 0 90px 0 50px;
+}
+
+.sign-up-now {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}

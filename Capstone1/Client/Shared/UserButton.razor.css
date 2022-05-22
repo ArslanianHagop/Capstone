@@ -1,0 +1,16 @@
+﻿.show-menu {
+    display: block;
+    margin: 5px 30px 0 520px;
+}
+
+.user-button {
+    margin: 5px 30px 0 570px;
+}
+
+.top-row a {
+    margin-left: 0;
+}
+
+.dropdown-item:hover {
+    text-decoration: underline;
+}

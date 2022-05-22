@@ -1,0 +1,61 @@
+﻿@inject NavigationManager NavigationManager
+@inject IChatService ChatService
+
+<div class="input-group">
+	<input  @bind-value="searchText"
+			@bind-value:event="oninput"
+			type="search"
+			list="users"
+			@onkeyup="HandleSearch"
+			class="form-control"
+			placeholder="Search Chat User..."
+			@ref="searchInput" />
+	<datalist id="users">
+		@foreach (var suggestion in suggestions)
+		{
+			<option>@suggestion</option>
+		}
+	</datalist>
+	<div class="input-group-append">
+		<button class="btn btn-primary" @onclick="SearchChatUser">
+			<span class="oi oi-magnifying-glass"></span>
+		</button>
+	</div>
+</div>
+
+@code {
+	private string searchText = string.Empty;
+	private List<string> suggestions = new List<string>();
+	protected ElementReference searchInput;
+
+	protected override async Task OnAfterRenderAsync(bool firstRender)
+	{
+		if (firstRender)
+		{
+			await searchInput.FocusAsync();
+		}
+	}
+
+	public void SearchChatUser()
+	{
+		if (searchText.Equals(string.Empty))
+		{
+			NavigationManager.NavigateTo("chatMenu/1");
+		}
+		else
+		{
+			NavigationManager.NavigateTo($"chatMenu/search/{searchText}/1");
+		}
+	}
+
+	public async Task HandleSearch(KeyboardEventArgs args)
+	{
+		if(args.Key == null || args.Key.Equals("Enter"))
+		{
+			SearchChatUser();
+		}else if(searchText.Length > 1)
+		{
+			suggestions = await ChatService.GetLoggedInUsersChatsUsersSearchSuggestions(searchText);
+		}
+	}
+}

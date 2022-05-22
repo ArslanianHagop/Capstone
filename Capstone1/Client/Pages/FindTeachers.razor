@@ -1,0 +1,106 @@
+﻿@page "/teachers/{page:int}"
+@page "/teachers/search/{searchText}/{page:int}"
+@inject IAuthService AuthService
+@inject ITeacherService TeacherService
+@inject IInterestService InterestService
+@inject ILanguageService LanguageService
+@implements IDisposable
+@attribute [Authorize]
+
+<PageTitle>Find Teachers</PageTitle>
+
+<SearchTeachers />
+
+<table class="table">
+	<thead>
+		<tr>
+			<th>Name</th>
+			<th>Languages</th>
+			<th>Interests</th>
+		</tr>
+	</thead>
+	<tbody>
+		@if(TeacherService.Teachers != null && TeacherService.Teachers.Count != 0)
+		{
+			<Virtualize Items="TeacherService.Teachers" Context="teacher">
+				<tr>
+					<td><a href=@($"/teacher_profile/{teacher.Id}")>@teacher.FirstName @teacher.LastName</a></td>
+					<td>
+						@if(userLanguages != null && userLanguages.Count > 0)
+						{
+							@foreach (var userLanguage in userLanguages.Where(ul => ul.UserId == teacher.Id))
+							{
+								<div class="mb-3">
+									@foreach (var language in LanguageService.Languages)
+									{
+										if(userLanguage.LanguageId == language.Id)
+										{
+											<span>@language.Name</span>
+										}
+									}
+								</div>
+							}
+						}
+					</td>
+					<td>
+						@if(teacherInterests != null && teacherInterests.Count != 0)
+						{	
+							@foreach (var teacherInterest in teacherInterests.Where(ti => ti.TeacherId == teacher.Id))
+								{
+									<span>@InterestService.Interests.Find(i => i.Id == teacherInterest.InterestId).Name</span>
+									<br />
+								}
+						}
+					</td>
+				</tr>
+			</Virtualize>
+		}
+	</tbody>
+</table>
+
+@for (var i = 1; i <= Math.Ceiling((double)teachersCount/5); i++)
+{
+	<a class="btn @(i == Page ? "btn-info" : "btn-outline-info") page-selection"
+				href=@((SearchText == null || SearchText.Equals("")) ? $"teachers/{i}" : $"teachers/search/{SearchText}/{i}")>@i</a>
+}
+
+@code {
+
+	[Parameter]
+	public int Page { get; set; } = 1;
+
+	[Parameter]
+	public string? SearchText { get; set; } = null;
+
+	List<UserLanguage> userLanguages = new List<UserLanguage>();
+	List<TeacherInterest> teacherInterests = new List<TeacherInterest>();
+	int teachersCount = 0;
+
+	protected override async Task OnInitializedAsync()
+	{
+		await InterestService.GetInterests();
+		await LanguageService.GetLanguages();
+		userLanguages = await AuthService.GetAllUserLanguages();
+		teacherInterests = await TeacherService.GetAllTeacherInterests();
+		TeacherService.TeachersChanged += StateHasChanged;
+	}
+
+	public void Dispose()
+	{
+		TeacherService.TeachersChanged -= StateHasChanged;
+	}
+
+	protected override async Task OnParametersSetAsync()
+	{
+		if(SearchText == null || SearchText.Equals(""))
+		{
+			await TeacherService.GetTeachersPaginated(Page);
+			teachersCount = await TeacherService.GetTeachersCount();
+		}
+		else
+		{
+			await TeacherService.SearchTeachers(SearchText, Page);
+			teachersCount = await TeacherService.SearchTeachersCount(SearchText);
+		}
+	}
+}

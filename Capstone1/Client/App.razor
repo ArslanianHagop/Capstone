@@ -1,0 +1,74 @@
+﻿@inject NavigationManager NavigationManager
+@inject ILocalStorageService LocalStorage
+@inject IAuthService AuthService
+@inject IJSRuntime JSRuntime
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@implements IDisposable
+<CascadingAuthenticationState>
+	<Router AppAssembly="@typeof(App).Assembly">
+		<Found Context="routeData">
+			<AuthorizeRouteView RouteData="@routeData" DefaultLayout="this.myLayoutType">
+				<NotAuthorized>
+					<h3>Whoops! You're not allowed to see this page.</h3>
+					<h5>Please <a href="login?returnUrl=@NavigationManager.ToBaseRelativePath(NavigationManager.Uri)">login</a> or <a href="signup">register</a> for a new account.</h5>
+				</NotAuthorized>
+			</AuthorizeRouteView>
+			<FocusOnNavigate RouteData="@routeData" Selector="h1" />
+		</Found>
+		<NotFound>
+			<PageTitle>Not found</PageTitle>
+			<LayoutView Layout="@typeof(MyMainLayout)">
+				<p role="alert">Sorry, there's nothing at this address.</p>
+			</LayoutView>
+		</NotFound>
+	</Router>
+</CascadingAuthenticationState>
+
+@code{
+	private Type myLayoutType = typeof(MyMainLayout);
+
+	protected override void OnInitialized()
+	{
+		if (NavigationManager.Uri.Equals("https://localhost:7060/signup") || NavigationManager.Uri.Contains("https://localhost:7060/login") || NavigationManager.Uri.Equals("https://localhost:7060/"))
+		{
+			myLayoutType = typeof(MainLayout);
+		}
+		else
+		{
+			myLayoutType = typeof(MyMainLayout);
+		}
+		NavigationManager.LocationChanged += LocationChanged;
+	}
+
+	protected override async Task OnAfterRenderAsync(bool firstRender)
+	{
+		string authToken = await LocalStorage.GetItemAsStringAsync("authToken");
+		if (!string.IsNullOrEmpty(authToken))
+		{
+			if(await AuthService.CheckUserExpiration())
+			{
+				await LocalStorage.RemoveItemAsync("authToken");
+				await AuthenticationStateProvider.GetAuthenticationStateAsync();
+				NavigationManager.NavigateTo("");
+				await JSRuntime.InvokeAsync<object>("Alert", "your login session has expired!\nplease login again");
+			}
+		}
+	}
+
+	void LocationChanged(object sender, LocationChangedEventArgs e)
+	{
+		if (e.Location.Equals("https://localhost:7060/signup") || e.Location.Contains("https://localhost:7060/login") || e.Location.Equals("https://localhost:7060/"))
+		{
+			myLayoutType = typeof(MainLayout);
+		}
+		else
+		{
+			myLayoutType = typeof(MyMainLayout);
+		}
+	}
+
+	public void Dispose()
+	{
+	  NavigationManager.LocationChanged -= LocationChanged;
+	}
+}

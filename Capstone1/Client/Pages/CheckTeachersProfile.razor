@@ -1,0 +1,172 @@
+﻿@page "/teacher_profile/{teacherId:int}"
+@inject ITeacherService TeacherService
+@inject ILanguageService LanguageService
+@inject IInterestService InterestService
+@inject NavigationManager NavigationManager
+@attribute [Authorize]
+
+<PageTitle>Teacher Profile</PageTitle>
+
+@if(teacher == null)
+{
+	<span>@message</span>
+}
+else
+{
+	<h2>@teacher.FirstName @teacher.LastName</h2>
+	<AuthorizeView>
+		<Authorized>
+			<a href="/message/@TeacherId">Message @teacher.FirstName @teacher.LastName</a>
+		</Authorized>
+		<NotAuthorized>
+			<span>To message @teacher.FirstName @teacher.LastName <a href="login?returnUrl=@NavigationManager.ToBaseRelativePath(NavigationManager.Uri)">login</a></span>
+		</NotAuthorized>
+	</AuthorizeView>
+	<br />
+	<img src="@teacher.ProfilePic" style="width: 250px; height: 250px;" /> <br />
+	<h3>Languages</h3>
+	@if(teachersLanguages != null && teachersLanguages.Count > 0)
+	{
+		@foreach (var teacherLanguage in teachersLanguages)
+		{
+			<div class="mb-3">
+				@foreach (var language in LanguageService.Languages)
+				{
+					if(teacherLanguage.LanguageId == language.Id)
+					{
+						<span>@language.Name</span>
+					}
+				}
+			</div>
+		}
+	}
+
+	<h3>Interests</h3>
+	@if(teachersInterests != null && teachersInterests.Count > 0)
+	{
+		@foreach (var teachersInterest in teachersInterests)
+		{
+			<div class="mb-3">
+				@foreach (var interest in InterestService.Interests)
+				{
+					if(teachersInterest.InterestId == interest.Id)
+					{
+						<span>@interest.Name</span>
+					}
+				}
+			</div>
+		}
+	}
+
+	<h3>Teachers Background</h3>
+
+	<div class="header">
+		<div class="col">Position</div>
+		<div class="col">Company Name</div>
+		<div class="col">From-Month</div>
+		<div class="col">From-Year</div>
+		<div class="col">To-Month</div>
+		<div class="col">To-Year</div>
+	</div>
+	@if(teachersJobs != null && teachersJobs.Count > 0)
+	{
+		@foreach (var teachersJob in teachersJobs)
+	   {
+		   <div class="row">
+				<div class="col">
+					@teachersJob.Position
+				</div>
+				<div class="col">
+					@teachersJob.CompanyName
+				</div>
+				<div class="col">
+					@teachersJob.FromMonth
+				</div>
+				<div class="col">
+					@teachersJob.FromYear
+				</div>
+				<div class="col">
+					@teachersJob.ToMonth
+				</div>
+				<div class="col">
+					@teachersJob.ToYear
+				</div>
+			</div>
+	   }
+	}
+
+   <hr />
+
+	<div class="header">
+		<div class="col">Name</div>
+		<div class="col">Topics</div>
+		<div class="col">Link</div>
+	</div>
+	@if(teachersCourses != null && teachersCourses.Count > 0)
+	{
+		@foreach (var teachersCourse in teachersCourses)
+	   {
+		   <div class="row">
+				<div class="col">
+					@teachersCourse.Name
+				</div>
+				<div class="col">
+					@if(teacherCourseInterests != null && teacherCourseInterests.Count > 0)
+					{
+						@foreach (var teacherCourseInterest in teacherCourseInterests.Where(tci => tci.TeacherCourseId == teachersCourse.Id))
+					   {
+						   <span>@InterestService.Interests.Find(i => i.Id == teacherCourseInterest.InterestId).Name</span>
+						   <br />
+					   }
+					}
+				</div>
+				<div class="col">
+					@teachersCourse.CourseLink
+				</div>
+			</div>
+	   }
+	}
+   <hr />
+   <h5>Joined on @teacher.DateCreated</h5>
+
+}
+
+@code {
+
+
+	[Parameter]
+	public int TeacherId { get; set; }
+
+	private User teacher = null;
+	private string message = string.Empty;
+	List<TeacherInterest> teachersInterests = new List<TeacherInterest>();
+	List<UserLanguage> teachersLanguages = new List<UserLanguage>();
+	List<TeacherJob> teachersJobs = new List<TeacherJob>();
+	List<TeacherCourse> teachersCourses = new List<TeacherCourse>();
+	List<TeacherCourseInterest> teacherCourseInterests = new List<TeacherCourseInterest>();
+
+	protected override async Task OnParametersSetAsync()
+	{
+		message = "Loading teacher profile...";
+
+		var result = await TeacherService.GetTeacher(TeacherId);
+
+		if (!result.Success)
+		{
+			message = result.Message;
+		}
+		else
+		{
+			teacher = result.Data;
+		}
+
+		await LanguageService.GetLanguages();
+		await InterestService.GetInterests();
+		teachersInterests = await TeacherService.GetTeachersInterests(TeacherId);
+		teachersLanguages = await TeacherService.GetTeachersLanguages(TeacherId);
+		teachersJobs = await TeacherService.GetTeachersJobs(TeacherId);
+		teachersCourses = await TeacherService.GetTeachersCourses(TeacherId);
+		teacherCourseInterests = await TeacherService.GetAllTeacherCourseInterests();
+	}
+
+}

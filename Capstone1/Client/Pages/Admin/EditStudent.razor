@@ -1,0 +1,272 @@
+﻿@page "/admin/edit/student/{id:int}/{page:int}"
+@inject IInterestService InterestService
+@inject IPostService PostService
+@inject IProposalService ProposalService
+@inject IStudentService StudentService
+@inject ILanguageService LanguageService
+@inject IAuthService AuthService
+@inject NavigationManager NavigationManager
+
+<PageTitle>Admin edit student</PageTitle>
+
+<EditForm Model="userChange" OnValidSubmit="ChangeUserProfile">
+	<DataAnnotationsValidator />
+	<div class="mb-3">
+		<label for="firstName">First Name</label>
+		<InputText id="firstName" @bind-Value="userChange.FirstName" class="form-control" />
+		<ValidationMessage For="@(() => userChange.FirstName)" />
+	</div>
+	<div class="mb-3">
+		<label for="lastName">Last Name</label>
+		<InputText id="lastName" @bind-Value="userChange.LastName" class="form-control" />
+		<ValidationMessage For="@(() => userChange.LastName)" />
+	</div>
+	<div class="mb-3">
+		<label for="profilePic">Profile Picture</label>
+		<img src="@userChange.ProfilePic" style="width: 250px; height: 250px;" /> <br />
+		<InputFile OnChange="@HandleFileSelected"></InputFile>
+	</div>
+	<div class="col col-visible">
+		Visibility&emsp;<InputCheckbox @bind-Value="userChange.Visible" style="transform:scale(1.5, 1.5);"></InputCheckbox>
+	</div>
+	<hr />
+	<div class="header">
+		<div class="col">Language</div>
+		<div class="col"></div>
+	</div>
+	@if(userChange.UserLanguages != null && userChange.UserLanguages.Count > 0)
+	{
+		@foreach (var userLanguage in userChange.UserLanguages)
+		{
+			<div class="row">
+				<div class="col mb-3">
+					<InputSelect @bind-Value="userLanguage.LanguageId" class="form-control">
+						@foreach (var language in LanguageService.Languages)
+						{
+							<option value="@language.Id.ToString()">@language.Name</option>
+						}
+					</InputSelect>
+				</div>
+			<div class="col">
+				<button type="button" class="btn btn-primary" @onclick="(() => RemoveLanguage(userLanguage.LanguageId))">
+					<i class="oi oi-trash"></i>
+				</button>
+			</div>
+		</div>
+		}
+	}
+	<button type="button" class="btn btn-primary" @onclick="AddLanguage">
+		<i class="oi oi-plus"></i> Add Language
+	</button>
+	<br />
+	<br />
+	<button type="submit" class="btn btn-primary">Apply Profile Changes</button>
+</EditForm>
+
+<hr />
+
+<EditForm Model="student" OnValidSubmit="ChangeInterests">
+	<DataAnnotationsValidator></DataAnnotationsValidator>
+	@if(student.StudentInterests != null && student.StudentInterests.Count != 0)
+	{
+		@foreach (var studentInterest in student.StudentInterests)
+		{
+			<div class="row">
+				<div class="col mb-3">
+					<InputSelect @bind-Value="studentInterest.InterestId" class="form-control">
+						@foreach (var interest in InterestService.Interests)
+						{
+							<option value="@interest.Id.ToString()">@interest.Name</option>
+						}
+					</InputSelect>
+				</div>
+				<div class="col mb-3">
+					<button type="button" class="btn btn-primary" @onclick="(() => RemoveInterest(studentInterest.InterestId))">
+						<i class="oi oi-trash"></i>
+					</button>
+				</div>
+			</div>
+		}
+	}
+	<button type="button" class="btn btn-primary" @onclick="AddInterest">
+		<i class="oi oi-plus"></i> Add Interest
+	</button>
+	<br />
+	<br />
+	<button type="submit" class="btn btn-primary">Update Interests</button>
+	<div class="@messageCssClass">
+		<span>@message</span>
+	</div>
+	<hr />
+</EditForm>
+
+<table class="table">
+	<thead>
+		<tr>
+			<th>Post Title</th>
+			<th>Course type</th>
+			<th>Budget</th>
+			<th>Edit?</th>
+			<th>Proposals Count</th>
+			<th></th>
+		</tr>
+	</thead>
+	<tbody>
+		@if(posts != null && postsCount != 0)
+		{
+			<Virtualize Items="posts" Context="post">
+				<tr style="background-color: @(post.IsAccepted ? "lightgreen" : "white")">
+					<td>@post.Title</td>
+					<td>
+						@if(postInterests != null && postInterests.Count > 0)
+						{
+							@foreach (var postInterest in postInterests.Where(pi => pi.PostId == post.Id))
+							{
+								<span>@InterestService.Interests.Find(i => i.Id == postInterest.InterestId).Name</span>
+								<br />
+							}
+						}
+					</td>
+					<td>@post.Budget$/1hr</td>
+					<td>
+						@if(!post.IsAccepted)
+						{
+								<button class="btn btn-primary" @onclick="(() => EditPost(post.Id))">
+									<i class="oi oi-pencil"></i>
+								</button>
+						}
+					</td>
+					<td>@proposals.Where(p => p.PostId == post.Id).ToList().Count</td>
+					<td><a class="btn btn-primary" href="/PostsProposals/@post.Id/1">Proposals</a></td>
+				</tr>
+			</Virtualize>
+		}
+	</tbody>
+</table>
+
+<div class="float-end">
+	@for (var i = 1; i <= Math.Ceiling((double)postsCount / 5); i++)
+	{
+		<a class="btn @(i == Page ? "btn-info" : "btn-outline-info") page-selection"
+					href=@PostsPagination(i)>@i</a>
+	}
+</div>
+
+@code {
+	[Parameter]
+	public int Id { get; set; }
+
+	[Parameter]
+	public int Page { get; set; } = 1;
+
+	Student student = new Student();
+	UserChange userChange = new UserChange();
+	List<PostInterest> postInterests = new List<PostInterest>();
+	List<Post> posts = new List<Post>();
+	int postsCount = 0;
+	List<Proposal> proposals = new List<Proposal>();
+	string message = string.Empty;
+	string messageCssClass = string.Empty;
+
+	protected override async Task OnInitializedAsync()
+	{
+		await InterestService.GetInterests();
+		await LanguageService.GetLanguages();
+		postInterests = await PostService.GetAllPostInterests();
+		proposals = await ProposalService.GetAllProposals();
+	}
+
+	protected override async Task OnParametersSetAsync()
+	{
+		userChange = await AuthService.GetUserProfileById(Id);
+		student.StudentInterests = await StudentService.GetStudentsInterests(Id);
+		student.StudentId = Id;
+		postsCount = await PostService.GetStudentsPostsCount(Id);
+		posts = await PostService.GetStudentsPostsPaginated(Id, Page);
+	}
+
+	async Task HandleFileSelected(InputFileChangeEventArgs inputFileChangeEvent)
+	{
+		var file = inputFileChangeEvent.File;
+		string fileType = inputFileChangeEvent.File.ContentType;
+		if (file != null)
+		{
+			var buffer = new byte[file.Size];
+			await file.OpenReadStream(50999282).ReadAsync(buffer);
+
+			userChange.ProfilePic = $"data:{fileType};base64,{Convert.ToBase64String(buffer)}";
+		}
+	}
+
+	void RemoveLanguage(int languageId)
+	{
+		var language = userChange.UserLanguages.Find(l => l.LanguageId == languageId);
+		if (language == null)
+		{
+			return;
+		}
+
+		userChange.UserLanguages.Remove(language);
+	}
+
+	string PostsPagination(int i)
+	{
+		return $"/admin/edit/student/{Id}/{i}";
+	}
+
+	async void ChangeInterests()
+	{
+		try
+		{
+			var result = await StudentService.ChangeInterests(student);
+			message = result.Message;
+			if (result.Success)
+				messageCssClass = "text-success";
+			else
+				messageCssClass = "text-danger";
+		}
+		catch
+		{
+			message = "You have selected the same interest more than once";
+		}
+	}
+
+	void AddLanguage()
+	{
+		userChange.UserLanguages.Add(new UserLanguage { UserId = Id });
+	}
+
+	private async Task ChangeUserProfile()
+	{
+		try
+		{
+			var result = await AuthService.ChangeUserProfileById(Id, userChange);
+			message = result.Message;	
+		}
+		catch
+		{
+			message = "You have selected the same language more than once.";
+		}
+	}
+
+	void RemoveInterest(int interestId)
+	{
+		var interest = student.StudentInterests.Find(i => i.InterestId == interestId);
+		if (interest == null)
+		{
+			return;
+		}
+
+		student.StudentInterests.Remove(interest);
+	}
+
+	void AddInterest()
+	{
+		student.StudentInterests.Add(new StudentInterest { StudentId = Id });
+	}
+
+	void EditPost(int postId)
+	{
+		NavigationManager.NavigateTo($"student/post/{postId}");
+	}
+}

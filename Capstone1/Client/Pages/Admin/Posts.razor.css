@@ -1,0 +1,56 @@
+﻿body {
+}
+
+.container {
+    margin: 2rem auto;
+    width: 80%;
+    transition: transform 0.1s;
+}
+
+    .container:hover {
+        transform: scale(1.1);
+    }
+
+.post {
+    background-color: #fff;
+    box-shadow: 0 0 2.5rem rgb(0, 0, 0, 0.28);
+    border-radius: 20px;
+    padding: 2rem;
+}
+
+.post-details, .icon-text {
+    display: flex;
+    align-items: center;
+}
+
+.icon-text {
+    margin: 1rem;
+}
+
+.post-cta {
+    margin-top: 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+img {
+    border-radius: 50%;
+    height: 100px;
+}
+
+.post-title-styling {
+    text-decoration: none;
+    font-weight: bold;
+    color: var(--color-primary);
+}
+
+    .post-title-styling:hover {
+        color: blue;
+        text-decoration: underline;
+    }
+
+.page-selection {
+    margin-right: 15px;
+    margin-bottom: 30px;
+}

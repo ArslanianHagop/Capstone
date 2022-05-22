@@ -1,0 +1,382 @@
+﻿@inject IPostService PostService
+@inject IInterestService InterestService
+@inject ITeacherService TeacherService
+@inject IStudentService StudentService
+@inject NavigationManager NavigationManager
+@inject IProposalService ProposalService
+@inject ILocalStorageService LocalStorage
+@implements IDisposable
+
+<SearchPosts />
+
+<br />
+
+@if (PostService.Posts == null || PostService.Posts.Count == 0)
+{
+	<span>@PostService.Message</span>
+}
+else
+{
+	<button class="btn btn-primary px-2 mb-2" @onclick="FiltersButton">
+		<i class="oi oi-menu"></i> @filtersText
+	</button>
+	if (isStudent)
+	{
+		<button class="btn btn-primary float-end px-2" @onclick="CreatePost">
+			<i class="oi oi-plus"></i> Add a new post
+		</button>
+	}
+	if (filtersFlag)
+	{
+		@foreach (var interest in allInterests)
+		{
+			<EditForm Model="interest">
+				<div class="ml-5 mb-1">
+					<InputCheckbox id="isSelected" @bind-Value="interest.IsSelected" @onclick="(() => FilterPosts(allInterests, interest))" class="form-check-input"></InputCheckbox>
+					<label for="isSelected" class="form-check-label">@interest.Name</label>
+				</div>
+			</EditForm>
+		}
+		<label class="container" style="display: inline;">
+			<input class="form-check-input ml-5 mb-1" @onclick="HighestBudget" checked=@highestBudgetSorted type="checkbox">
+			<span class="checkmark">Highest Budget</span>
+		</label>
+		<br />
+		<label class="container" style="display: inline;">
+			<input class="form-check-input ml-5 mb-1" @onclick="NewestSorted" checked=@newestSorted type="checkbox">
+			<span class="checkmark">Newest</span>
+		</label>
+	}
+	<br />
+	<ul class="list-unstyled">
+		@if(((postsFlag && PostService.Posts != null && PostService.Posts.Count > 0) || (!postsFlag && PostService.PostsPaged != null && PostService.PostsPaged.Count > 0)) && authorsProfilePics != null && authorsProfilePics.Count != 0 && authors != null && authors.Count != 0)
+		{
+			@foreach (var post in postsFlag ? PostService.Posts : PostService.PostsPaged)
+			{
+				<li>
+					<div class="container">
+						<div class="post">
+							<div class="post-details">
+
+								<img src="@authorsProfilePics.FirstOrDefault(a => a.Key == post.Id).Value">
+
+								<div class="icon-text">
+									<h2 class="text"><a class="post-title-styling" href="/student_profile/@post.StudentId/1">@authors.FirstOrDefault(a => a.Key == post.Id).Value</a></h2>
+								</div>
+
+								@if(postInterests != null && postInterests.Count > 0)
+								{
+									@foreach (var postInterest in postInterests.Where(pi => pi.PostId == post.Id))
+									{
+										<div class="icon-text">
+											<span class="text">@InterestService.Interests.Find(i => i.Id == postInterest.InterestId).Name&ensp;</span>
+										</div>
+									}
+								}
+							</div>
+
+							<h2>
+								<a class="post-title-styling" href="/post/@post.Id">
+									@post.Title
+								</a>
+							</h2>
+
+							<p>
+								@post.Description
+							</p>
+
+							<div class="post-cta">
+								Budget: @post.Budget$/1hr
+
+								@if (isTeacher)
+								{
+									if (loggedInTeachersProposals == null || loggedInTeachersProposals.Count == 0)
+									{
+										<button class="proposal-button" @onclick="(() => ProposeOnPost(post.Id))">Make a Proposal</button>
+									}
+									else
+									{
+										if (loggedInTeachersProposals.Any(p => p.PostId == post.Id))
+										{
+											<button class="proposal-button" @onclick="(() => ProposeOnPost(post.Id, loggedInTeachersProposals.FirstOrDefault(p => p.PostId == post.Id).Id))">Update your Proposal</button>
+										}
+										else
+										{
+											<button class="proposal-button" @onclick="(() => ProposeOnPost(post.Id))">Make a Proposal</button>
+										}
+									}
+								}
+							</div>
+						</div>
+					</div>
+					<hr />
+				</li>
+			}
+			<MudPagination Color="Color.Primary" Count="PostService.PageCount" SelectedChanged="PaginationNavigate"/>
+		}
+	</ul>
+}
+
+@code {
+
+	List<PostInterest> postInterests = new List<PostInterest>();
+	List<Interest> allInterests = new List<Interest>();
+	List<Proposal> loggedInTeachersProposals = new List<Proposal>();
+	bool postsFlag = true;
+	bool isTeacher = false;
+	bool isStudent = false;
+	bool highestBudgetSorted = false;
+	bool newestSorted = false;
+	Dictionary<int, string> authors = new Dictionary<int, string>();
+	Dictionary<int, string> authorsProfilePics = new Dictionary<int, string>();
+	string filtersText = "Show Filters";
+	bool filtersFlag = false;
+
+	private void PaginationNavigate(int i)
+	{
+		if (PostService.LastSearchText.Equals(""))
+		{
+			if (highestBudgetSorted)
+			{
+				NavigationManager.NavigateTo($"/posts/{i}/highest_budget_sorted/{true}");
+			}
+			else if (newestSorted)
+			{
+				NavigationManager.NavigateTo($"/posts/{i}/newest_sorted/{true}");
+			}
+			else
+			{
+				NavigationManager.NavigateTo($"/posts/{i}");
+			}
+		}
+		else
+		{
+			if (highestBudgetSorted)
+			{
+				NavigationManager.NavigateTo($"/posts/search/{PostService.LastSearchText}/{i}/highest_budget_sorted/{true}");
+			}
+			else if (newestSorted)
+			{
+				NavigationManager.NavigateTo($"/posts/search/{PostService.LastSearchText}/{i}/newest_sorted/{true}");
+			}
+			else
+			{
+				NavigationManager.NavigateTo($"/posts/search/{PostService.LastSearchText}/{i}");
+			}
+		}
+	}
+
+	protected override async Task OnInitializedAsync()
+	{
+		PostService.PostsChanged += StateHasChanged;
+		authors = await PostService.GetPostsAuthors();
+		authorsProfilePics = await PostService.GetPostsAuthorsProfilePics();
+		await InterestService.GetInterests();
+		allInterests = InterestService.Interests;
+		postInterests = await PostService.GetAllPostInterests();
+		PostService.PostsPaged = new List<Post>();
+		isStudent = await StudentService.StudentRoleCheck();
+		isTeacher = await TeacherService.TeacherRoleCheck();
+		if (isTeacher)
+		{
+			string authToken = await LocalStorage.GetItemAsStringAsync("authToken");
+			if (!string.IsNullOrEmpty(authToken))
+				loggedInTeachersProposals = await ProposalService.GetLoggedInTeachersProposals();
+		}
+	}
+
+	public void Dispose()
+	{
+		PostService.PostsChanged -= StateHasChanged;
+	}
+
+	async Task FilterPosts(List<Interest> interests, Interest interest)
+	{
+		var forAll = false;
+		interest.IsSelected = !interest.IsSelected;
+		await PostService.FilterPosts(interests);
+		if (PostService.LastSearchText.Equals(""))
+		{
+			if (highestBudgetSorted)
+			{
+				NavigationManager.NavigateTo($"posts/{PostService.CurrentPage}/highest_budget_sorted/{true}");
+				PostService.FilteredPosts = (from n in PostService.FilteredPosts
+												orderby n.Budget descending
+												select n).ToList();
+			}
+			else if (newestSorted)
+			{
+				NavigationManager.NavigateTo($"posts/{PostService.CurrentPage}/newest_sorted/{true}");
+				PostService.FilteredPosts = (from n in PostService.FilteredPosts
+												orderby n.DateCreated descending
+												select n).ToList();
+			}
+			else
+			{
+				NavigationManager.NavigateTo($"posts/{PostService.CurrentPage}");
+			}
+
+			PostService.PostsPaged = PostService.FilteredPosts.Skip((PostService.CurrentPage - 1) * 2).Take(2).ToList();
+		}
+		else if (!PostService.LastSearchText.Equals(""))
+		{
+			if (highestBudgetSorted)
+			{
+				NavigationManager.NavigateTo($"posts/search/{PostService.LastSearchText}/{PostService.CurrentPage}/highest_budget_sorted/{true}");
+				PostService.FilteredPosts = (from n in PostService.FilteredPosts
+												orderby n.Budget descending
+												select n).ToList();
+			}
+			else if (newestSorted)
+			{
+				NavigationManager.NavigateTo($"posts/search/{PostService.LastSearchText}/{PostService.CurrentPage}/newest_sorted/{true}");
+				PostService.FilteredPosts = (from n in PostService.FilteredPosts
+												orderby n.DateCreated descending
+												select n).ToList();
+			}
+			else
+			{
+				NavigationManager.NavigateTo($"posts/search/{PostService.LastSearchText}/{PostService.CurrentPage}");
+			}
+
+			PostService.PostsPaged = await PostService.SearchPostsReturn(PostService.LastSearchText, PostService.CurrentPage, PostService.FilteredPosts);
+		}
+
+		postsFlag = false;
+		foreach (var interestItem in allInterests)
+		{
+			if (interestItem.IsSelected)
+			{
+				forAll = forAll || interestItem.IsSelected;
+			}
+		}
+		if (!forAll)
+		{
+			postsFlag = true;
+			PostService.FilteredPosts = new List<Post>();
+			if (highestBudgetSorted)
+			{
+				List<Post> filterPosts = await PostService.GetAllPosts();
+				filterPosts = (from n in filterPosts
+										orderby n.Budget descending
+										select n).ToList();
+				if (PostService.LastSearchText.Equals(""))
+				{
+					await PostService.GetPostsPagination(PostService.CurrentPage, filterPosts);
+				}
+				else if (!PostService.LastSearchText.Equals(""))
+				{
+					await PostService.SearchPosts(PostService.LastSearchText, PostService.CurrentPage, filterPosts);
+				}
+			}
+			else if (newestSorted)
+			{
+				List<Post> filterPosts = await PostService.GetAllPosts();
+				filterPosts = (from n in filterPosts
+										orderby n.DateCreated descending
+										select n).ToList();
+				if (PostService.LastSearchText.Equals(""))
+				{
+					await PostService.GetPostsPagination(PostService.CurrentPage, filterPosts);
+				}
+				else if (!PostService.LastSearchText.Equals(""))
+				{
+					await PostService.SearchPosts(PostService.LastSearchText, PostService.CurrentPage, filterPosts);
+				}
+			}
+			else
+			{
+				if (PostService.LastSearchText.Equals(""))
+				{
+					await PostService.GetPostsPagination(PostService.CurrentPage, await PostService.GetAllPosts());
+				}
+				else if (!PostService.LastSearchText.Equals(""))
+				{
+					await PostService.SearchPosts(PostService.LastSearchText, PostService.CurrentPage, await PostService.GetAllPosts());
+				}
+			}
+		}
+	}
+
+	void HighestBudget()
+	{
+		highestBudgetSorted = !highestBudgetSorted;
+		if (highestBudgetSorted)
+			newestSorted = false;
+		if (PostService.LastSearchText.Equals(""))
+		{
+			if (highestBudgetSorted)
+			{
+				NavigationManager.NavigateTo($"/posts/{PostService.CurrentPage}/highest_budget_sorted/{true}");
+			}
+			else
+			{
+				NavigationManager.NavigateTo($"/posts/{PostService.CurrentPage}");
+			}
+		}
+		else if (!PostService.LastSearchText.Equals(""))
+		{
+			if (highestBudgetSorted)
+			{
+				NavigationManager.NavigateTo($"/posts/search/{PostService.LastSearchText}/{PostService.CurrentPage}/highest_budget_sorted/{true}");
+			}
+			else
+			{
+				NavigationManager.NavigateTo($"/posts/search/{PostService.LastSearchText}/{PostService.CurrentPage}");
+			}
+		}
+	}
+
+	void NewestSorted()
+	{
+		newestSorted = !newestSorted;
+		if (newestSorted)
+			highestBudgetSorted = false;
+		if (PostService.LastSearchText.Equals(""))
+		{
+			if (newestSorted)
+			{
+				NavigationManager.NavigateTo($"/posts/{PostService.CurrentPage}/newest_sorted/{true}");
+			}
+			else
+			{
+				NavigationManager.NavigateTo($"/posts/{PostService.CurrentPage}");
+			}
+		}
+		else if (!PostService.LastSearchText.Equals(""))
+		{
+			if (newestSorted)
+			{
+				NavigationManager.NavigateTo($"/posts/search/{PostService.LastSearchText}/{PostService.CurrentPage}/newest_sorted/{true}");
+			}
+			else
+			{
+				NavigationManager.NavigateTo($"/posts/search/{PostService.LastSearchText}/{PostService.CurrentPage}");
+			}
+		}
+	}
+
+	void ProposeOnPost(int postId)
+	{
+		NavigationManager.NavigateTo($"/Proposal/{postId}");
+	}
+
+	void ProposeOnPost(int postId, int proposalId)
+	{
+		NavigationManager.NavigateTo($"/Proposal/{postId}/{proposalId}");
+	}
+
+	void FiltersButton()
+	{
+		filtersFlag = !filtersFlag;
+		if (filtersFlag)
+			filtersText = "Hide filters";
+		else
+			filtersText = "Show filters";
+	}
+
+	void CreatePost()
+	{
+		NavigationManager.NavigateTo("student/post");
+	}
+}

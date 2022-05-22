@@ -1,0 +1,12 @@
+﻿.page-selection {
+    margin-right: 15px;
+    margin-bottom: 30px;
+}
+
+a{
+    color: blue;
+}
+
+    a:hover{
+        text-decoration: underline;
+    }

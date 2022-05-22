@@ -1,0 +1,49 @@
+﻿.chat-box {
+    padding-left: 20px;
+    flex: 1;
+}
+
+.chat-r {
+    display: flex;
+}
+
+    .chat-r .sp {
+        flex: 1;
+    }
+
+.chat-l {
+    display: flex;
+}
+
+    .chat-l .sp {
+        flex: 1;
+    }
+
+.chat-box .mess {
+    max-width: 600px;
+    background: #F7FCF6;
+    padding: 10px;
+    border-radius: 10px;
+    margin: 20px 0px;
+}
+
+    .chat-box .mess p {
+        font-size: 18px;
+    }
+
+.chat-box .mess-r {
+    background: #E2FFC7;
+}
+
+.chat-box .check {
+    float: right;
+}
+
+    .chat-box .check img {
+        width: 20px;
+    }
+
+    .chat-box .check span {
+        color: #888;
+        font-size: 12px;
+    }

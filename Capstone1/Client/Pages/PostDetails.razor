@@ -1,0 +1,144 @@
+﻿@page "/post/{id:int}"
+@inject IPostService PostService
+@inject ITagService TagService
+@inject ITeacherService TeacherService
+@inject IProposalService ProposalService
+@inject ILocalStorageService LocalStorage
+@inject NavigationManager NavigationManager
+
+<PageTitle>Post Details</PageTitle>
+
+@if (post == null)
+{
+	<span>@message</span>
+}
+else
+{
+	<div class="container">
+		<div class="post">
+			<div class="post-details">
+				<div class="mr-2">
+					<h2><a class="post-author" href="/student_profile/@post.StudentId/1">@fullName</a></h2>
+				</div>
+
+				@if (post.PostInterests != null && post.PostInterests.Count > 0)
+				{
+					<div>
+						@foreach (var postInterest in post.PostInterests)
+						{
+							<span>@postInterest.Interest.Name &nbsp</span>
+						}
+					</div>
+				}
+			</div>
+
+			<h2>
+				@post.Title
+			</h2>
+
+			<p>
+				Description: @post.Description
+			</p>
+
+			<span>Tags</span>
+			<div class="post-details">
+				@if (TagService.PostsTags != null && TagService.PostsTags.Count > 0)
+				{
+					<div class="mb-3">
+						@foreach (var postsTag in TagService.PostsTags)
+						{
+							<h5>@postsTag.Name</h5>
+						}
+					</div>
+				}
+			</div>
+
+			<div class="post-cta">
+				Budget: @post.Budget$/1hr
+
+				@if (post.IsAccepted)
+				{
+					<h5 class="text-success">Accepted</h5>
+				}
+				else
+				{
+					@if (isTeacher)
+					{
+						if(proposal != null)
+						{
+							<div>
+								<button class="btn btn-primary" @onclick="(() => ProposeOnPost(Id, proposal.Id))">Update your Proposal</button>
+							</div>
+						}
+						else
+						{
+							<div>
+								<button class="btn btn-primary" @onclick="(() => ProposeOnPost(Id))">Make a Proposal</button>
+							</div>
+						}
+					}
+				}
+			</div>
+			<br />
+			<AuthorizeView>
+				<Authorized>
+					<h5>
+						<a class="toMessage" href="/message/@post.StudentId">Message @fullName</a>
+					</h5>
+				</Authorized>
+				<NotAuthorized>
+					<span>To message @fullName <a class="toMessage" href="login?returnUrl=@NavigationManager.ToBaseRelativePath(NavigationManager.Uri)">login</a></span>
+				</NotAuthorized>
+			</AuthorizeView>
+		</div>
+	</div>
+	<hr />
+	<h5>
+		This post was made on @post.DateCreated
+	</h5>
+}
+
+@code {
+
+	private Post? post = null;
+	private Proposal? proposal = null;
+	private string message = string.Empty;
+	private string fullName = string.Empty;
+	private bool isTeacher = false;
+
+	[Parameter]
+	public int Id { get; set; }
+
+	protected override async Task OnParametersSetAsync()
+	{
+		message = "Loading Post...";
+		isTeacher = await TeacherService.TeacherRoleCheck();
+		string authToken = await LocalStorage.GetItemAsStringAsync("authToken");
+		if (!string.IsNullOrEmpty(authToken))
+			proposal = await ProposalService.GetLoggedInTeachersProposalOnPost(Id);
+
+		var result = await PostService.GetPost(Id);
+
+		if (!result.Success)
+		{
+			message = result.Message;
+		}
+		else
+		{
+			post = result.Data;
+		}
+
+		await TagService.GetPostsTags(Id);
+		fullName = await PostService.GetNameOfPoster(post.StudentId);
+	}
+
+	void ProposeOnPost(int postId)
+	{
+		NavigationManager.NavigateTo($"/Proposal/{postId}");
+	}
+
+	void ProposeOnPost(int postId, int proposalId)
+	{
+		NavigationManager.NavigateTo($"/Proposal/{postId}/{proposalId}");
+	}
+}

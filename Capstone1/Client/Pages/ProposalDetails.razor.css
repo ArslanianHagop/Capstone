@@ -1,0 +1,40 @@
+﻿body {
+}
+
+.container {
+    margin: 2rem auto;
+    width: 80%;
+}
+
+.post {
+    background-color: #fff;
+    box-shadow: 0 0 2.5rem rgb(0, 0, 0, 0.28);
+    border-radius: 20px;
+    padding: 2rem;
+}
+
+.post-description{
+    font-size: 26px;
+}
+
+.post-cta {
+    font-size: 26px;
+}
+
+a{
+    color: var(--color-secondary);
+    text-decoration: underline;
+}
+
+    a:hover {
+        color: var(--color-quaternary);
+    }
+
+
+.acceptance-message{
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin: 0;
+    padding: 0;
+}

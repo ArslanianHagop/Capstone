@@ -1,0 +1,87 @@
+﻿@inject IChatService ChatService
+@inject IAuthService AuthService
+@inject NavigationManager NavigationManager
+@implements IAsyncDisposable
+
+<div>
+	<button @onclick="ToChatMenu" class="btn @cssClass" style="margin: 5px 0 0 0">
+		<i class="oi oi-envelope-closed"></i>
+	</button>
+</div>
+
+@code {
+
+	List<Chat> recipientChats = new List<Chat>();
+	string cssClass = "btn-outline-info";
+	int currentUserId = 0;
+
+	private HubConnection? hubConnection;
+
+	protected override async Task OnInitializedAsync()
+	{
+		if(!(await AuthService.CheckUserExpiration()))
+			currentUserId = await AuthService.GetCurrentUserId();
+		var recipientChatsService = await ChatService.GetLoggedInUsersReceivedMessages();
+		if (recipientChatsService.Success)
+		{
+			recipientChats = recipientChatsService.Data;
+			foreach (var recipientChat in recipientChats)
+			{
+				if (recipientChat.IsNew)
+				{
+					cssClass = "btn-danger";
+					break;
+				}
+			}
+		}
+		else
+		{
+			recipientChats = new List<Chat>();
+		}
+
+		hubConnection = new HubConnectionBuilder()
+			.WithUrl(NavigationManager.ToAbsoluteUri("/chathub"))
+			.Build();
+
+		hubConnection.On<int>("IsNewButton", async (recipientId) =>
+		{
+			if(recipientId == currentUserId)
+			{
+				var recipientChatsService = await ChatService.GetLoggedInUsersReceivedMessages();
+				if (recipientChatsService.Success)
+				{
+					cssClass = "btn-outline-info";
+					recipientChats = recipientChatsService.Data;
+					foreach (var recipientChat in recipientChats)
+					{
+						if (recipientChat.IsNew)
+						{
+							cssClass = "btn-danger";
+							break;
+						}
+					}
+				}
+				else
+				{
+					recipientChats = new List<Chat>();
+				}
+				StateHasChanged();
+			}
+		});
+
+		await hubConnection.StartAsync();
+	}
+
+	void ToChatMenu()
+	{
+		NavigationManager.NavigateTo("chatMenu/1");
+	}
+
+	public async ValueTask DisposeAsync()
+	{
+		if(hubConnection != null)
+		{
+			await hubConnection.DisposeAsync();
+		}
+	}
+}

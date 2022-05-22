@@ -1,0 +1,285 @@
+﻿@page "/student/post"
+@page "/student/post/{id:int}"
+@inject IPostService PostService
+@inject IInterestService InterestService
+@inject ITagService TagService
+@inject IAuthService AuthService
+@inject IStudentService StudentService
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
+@attribute [Authorize(Roles = "Admin,Student")]
+
+<PageTitle>Edit Post</PageTitle>
+
+@if((post.StudentId == loggedInUserId || isAdmin) || (Id == 0 && isStudent))
+{
+	@if (loading)
+	{
+		<span>@message</span>
+	}
+	else
+	{
+		@if (post.Editing)
+		{
+			<h3>Edit "@post.Title"</h3>
+		}
+		else if (post.IsNew)
+		{
+			<h3>Create a new Post</h3>
+		}
+
+		@if(post.IsAccepted)
+		{
+			@if (isAdmin)
+			{
+				<h3 class="text-success">You can't update this post as it has accepted a proposal</h3>
+			}
+			else
+			{
+				<h3 class="text-success">You can't update this post as you have already accepted a proposal for the post "@post.Title"</h3>
+			}
+		}
+		else
+		{
+			<EditForm Model="post" OnValidSubmit="AddOrUpdatePost">
+				<DataAnnotationsValidator></DataAnnotationsValidator>
+				<div class="mb-0">
+					<label for="title">Title</label>
+					<InputText id="title" @bind-Value="post.Title" class="form-control"></InputText>
+				</div>
+				<div class="mb-0">
+					<label for="description">Description</label>
+					<InputTextArea id="description" @bind-Value="post.Description" class="form-control"></InputTextArea>
+				</div>
+				<hr />
+				<div class="header">
+					<div class="col">Course type</div>
+					<div class="col"></div>
+				</div>
+				@if(post.PostInterests != null && post.PostInterests.Count > 0)
+				{
+					@foreach (var postInterest in post.PostInterests)
+				   {
+					   <div class="row">
+						   <div class="col">
+							   <InputSelect @bind-Value="postInterest.InterestId" class="form-control">
+								   @foreach (var interest in InterestService.Interests)
+								  {
+									  <option value="@interest.Id.ToString()">@interest.Name</option>
+								  }
+							   </InputSelect>
+						   </div>
+						   <div class="col">
+							   <button type="button" class="btn btn-primary" @onclick="(() => RemoveInterest(postInterest.InterestId))">
+								   <i class="oi oi-trash"></i>
+							   </button>
+						   </div>
+					   </div>
+				   }
+				}
+			   <button type="button" class="btn btn-primary" @onclick="AddInterest">
+				   <i class="oi oi-plus"></i> Add Interest
+			   </button>
+			   <hr />
+			   <label for="tags">Tags</label>
+				@if(TagService.PostsTags != null && TagService.PostsTags.Count > 0)
+				{
+					@foreach (var postsTag in TagService.PostsTags)
+				  {
+					  <div class="row">
+						   <div class="col">
+							   <InputText id="tags" @bind-Value="postsTag.Name" class="form-control"></InputText>
+						   </div>
+						   <div class="col">
+							   <button type="button" class="btn btn-primary" @onclick="(() => RemoveTag(postsTag.Id))">
+								   <i class="oi oi-trash"></i>
+							   </button>
+						   </div>
+					   </div>
+				  }
+				}
+			  <button type="button" class="btn btn-primary" @onclick="AddTag">
+				   <i class="oi oi-plus"></i> Add Tag
+			   </button>
+			   <hr />
+			   <div class="mb-0">
+					<label for="budget">Budget$/1hr</label>
+					<InputNumber @bind-Value="post.Budget" class="form-control"></InputNumber>
+				</div>
+				<br />
+
+				@if (isAdmin)
+				{
+					<div class="col col-visible">
+						Visibility&emsp;<InputCheckbox @bind-Value="post.Visible" style="transform:scale(1.5, 1.5);"></InputCheckbox>
+					</div>
+					<br />
+				}
+  
+			   <button type="submit" class="btn btn-primary float-end">@applyText</button>
+			   <ValidationSummary></ValidationSummary>
+			</EditForm>
+			@if(!post.IsNew)
+			{
+				<button type="button" class="btn btn-danger float-start" @onclick="DeletePost">
+					Delete Post
+				</button>
+			}
+			<div>
+				<span class="text-danger">@errorMessage</span>
+			</div>
+		}
+
+	}
+}
+
+@code {
+	[Parameter]
+	public int Id { get; set; }
+
+	Post post = new Post();
+	bool isAdmin = false;
+	bool isStudent = false;
+	int loggedInUserId = 0;
+	bool loading = true;
+	string applyText = "";
+	string message = "Loading...";
+	string errorMessage = string.Empty;
+
+	protected override async Task OnInitializedAsync()
+	{
+		isAdmin = await AuthService.IsAdmin();
+		isStudent = await StudentService.StudentRoleCheck();
+		await InterestService.GetInterests();
+		await TagService.GetPostsTags(Id);
+		loggedInUserId = await AuthService.GetCurrentUserId();
+	}
+
+	protected override async Task OnParametersSetAsync()
+	{
+		if(Id == 0)
+		{
+			post = new Post { IsNew = true };
+			applyText = "Create Post";
+		}
+		else
+		{
+			Post dbPost = (await PostService.GetPost(Id)).Data;
+			if(dbPost == null)
+			{
+				message = $"Post with Id '{Id}' does not exist";
+				return;
+			}
+
+			post = dbPost;
+			post.Editing = true;
+			applyText = "Update Post";
+		}
+		loading = false;
+	}
+
+	void AddInterest()
+	{
+		post.PostInterests.Add(new PostInterest { });
+	}
+
+	void AddTag()
+	{
+		TagService.PostsTags.Add(new Tag { });
+	}
+
+	void RemoveInterest(int interestId)
+	{
+		var interest = post.PostInterests.Find(pi => pi.InterestId == interestId);
+		if(interest == null)
+		{
+			return;
+		}
+		post.PostInterests.Remove(interest);
+	}
+
+	async void RemoveTag(int tagId)
+	{
+		var tag = TagService.PostsTags.Find(pt => pt.Id == tagId);
+		if(tag == null)
+		{
+			return;
+		}
+		if(tagId == 0)
+		{
+			TagService.PostsTags.Remove(tag);
+		}
+		else
+		{
+			TagService.PostsTags.Remove(tag);
+			await TagService.DeleteTag(tag);
+		}
+	}
+
+	async void DeletePost()
+	{
+		bool confirmed = await JSRuntime.InvokeAsync<bool>("confirm",
+		$"Do you really want to delete '{post.Title}'?");
+		if (confirmed)
+		{
+			await PostService.DeletePost(post);
+			NavigationManager.NavigateTo("profile/student/1");
+		}
+	}
+
+	async void AddOrUpdatePost()
+	{
+		if (post.IsNew)
+		{
+			try
+			{
+				var result = await PostService.AddPost(post);
+				if(TagService.PostsTags != null && TagService.PostsTags.Count > 0)
+				{
+					foreach (var postsTag in TagService.PostsTags)
+					{
+						postsTag.PostId = result.Id;
+						await TagService.AddTag(postsTag);
+					}
+				}
+				NavigationManager.NavigateTo($"student/post/{result.Id}");
+				errorMessage = "";
+			}
+			catch
+			{
+				errorMessage = "You have selected the same interest more than once.";
+				StateHasChanged();
+			}
+		}
+		else
+		{
+			post.IsNew = false;
+			var postServiceResponse = await PostService.UpdatePost(post);
+			if (postServiceResponse.Success)
+			{
+				if(TagService.PostsTags != null && TagService.PostsTags.Count > 0)
+				{
+					foreach (var postsTag in TagService.PostsTags)
+					{
+						postsTag.PostId = post.Id;
+						if(postsTag.Id == 0)
+						{
+							await TagService.AddTag(postsTag);
+						}
+						else
+						{
+							await TagService.UpdateTag(postsTag);
+						}
+					}
+				}
+				NavigationManager.NavigateTo($"student/post/{post.Id}", true);
+				errorMessage = "";
+			}
+			else
+			{
+				errorMessage = postServiceResponse.Message;
+				StateHasChanged();
+			}
+		}
+	}
+}

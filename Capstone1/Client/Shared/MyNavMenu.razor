@@ -1,0 +1,70 @@
+﻿@inject IPostService PostService
+
+@*didn't work in the css isolation file*@
+
+<div class="top-row ps-3 navbar navbar-dark navbar-toggler-wrapper">
+    <div class="container-fluid">
+        <button title="Navigation menu" class="navbar-toggler" @onclick="ToggleNavMenu">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+    </div>
+</div>
+
+<div class="@NavMenuCssClass" @onclick="ToggleNavMenu">
+    <div class="easyLearn">
+        <a href="">EasyLearn</a>
+    </div>
+    <nav class="flex-nav" style="margin-left: 250px;">
+        <div class="nav-item px-2">
+            <NavLink @onclick="EmptySearchText" class="nav-link" href="" Match="NavLinkMatch.All">
+                <span class="oi oi-home" aria-hidden="true"></span> Home
+            </NavLink>
+        </div>
+        <div class="nav-item px-2">
+            <NavLink class="nav-link" href="/users/1">
+                <span aria-hidden="true"></span> Users
+            </NavLink>
+        </div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="/students/1">
+                <span aria-hidden="true"></span> Students
+            </NavLink>
+        </div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="/teachers/1">
+                <span aria-hidden="true"></span> Teachers
+            </NavLink>
+        </div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href=@((PostService.CurrentPage == 0) ? "/posts/1" : $"/posts/{PostService.CurrentPage}")>
+                <span aria-hidden="true"></span> Posts
+            </NavLink>
+        </div>
+        <div class="nav-item">
+            <UserButton />
+        </div>
+        <div class="nav-item">
+            <AuthorizeView>
+                <Authorized>
+                    <ChatsButton />
+                </Authorized>
+            </AuthorizeView>
+        </div>
+    </nav>
+</div>
+
+@code {
+    private bool collapseNavMenu = true;
+
+    private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
+
+    private void ToggleNavMenu()
+    {
+        collapseNavMenu = !collapseNavMenu;
+    }
+
+    private void EmptySearchText()
+    {
+        PostService.LastSearchText = "";
+    }
+}

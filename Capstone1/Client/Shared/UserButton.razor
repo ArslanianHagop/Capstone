@@ -1,0 +1,73 @@
+﻿@inject ILocalStorageService LocalStorage
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager NavigationManager
+@inject IStudentService StudentService
+@inject ITeacherService TeacherService
+
+<div class="dropdown">
+	<button @onclick="ToggleUserMenu"
+			@onfocusout="HideUserMenu"
+			class="btn btn-outline-info dropdown-toggle user-button">
+		<i class="oi oi-person"></i>
+	</button>
+	<div class="dropdown-menu dropdown-menu-right @UserMenuCssClass">
+		<AuthorizeView>
+			<Authorized>
+				<a href="profile" class="dropdown-item text-primary">Profile</a>
+				@if(isStudent)
+				{
+					<a href="profile/student/1" class="dropdown-item text-primary">Student Profile</a>
+				}
+				else if (isTeacher)
+				{
+					<a href="profile/teacher/1" class="dropdown-item text-primary">Teacher Profile</a>
+				}
+				<hr />
+				<AdminMenu />
+				<button class="dropdown-item text-primary" @onclick="Logout">Logout</button>
+			</Authorized>
+			<NotAuthorized>
+				<a href="login?returnUrl=@NavigationManager.ToBaseRelativePath(NavigationManager.Uri)" class="dropdown-item text-primary">Login</a>
+				<a href="signup" class="dropdown-item text-primary">Register</a>
+			</NotAuthorized>
+		</AuthorizeView>
+	</div>
+</div>
+
+
+@code {
+	private bool showUserMenu = false;
+	private bool isStudent = false;
+	private bool isTeacher = false;
+
+	private string UserMenuCssClass => showUserMenu ? "show-menu" : null;
+
+
+	private async Task ToggleUserMenu()
+	{
+		showUserMenu = !showUserMenu;
+		if(!isStudent && !isTeacher)
+		{
+			isStudent = await StudentService.StudentRoleCheck();
+			if (!isStudent)
+			{
+				isTeacher = await TeacherService.TeacherRoleCheck();
+			}
+		}
+	}
+
+	private async Task HideUserMenu()
+	{
+		await Task.Delay(200);
+		showUserMenu = false;
+	}
+
+	private async Task Logout()
+	{
+		isStudent = false;
+		isTeacher = false;
+		await LocalStorage.RemoveItemAsync("authToken");
+		await AuthenticationStateProvider.GetAuthenticationStateAsync();
+		NavigationManager.NavigateTo("");
+	}
+}

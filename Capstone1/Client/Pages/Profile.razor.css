@@ -1,0 +1,128 @@
+﻿body{
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+.container1 {
+    position: relative;
+    width: auto;
+    background-color: #fff;
+    display: inline-block;
+}
+
+.forms-container1 {
+    position: absolute;
+    width: auto;
+    top: 0;
+    left: 0;
+}
+
+.form1 {
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    padding: 0rem 5rem;
+    transition: all 0.2s 0.7s;
+    overflow: hidden;
+    grid-column: 1 / 2;
+    grid-row: 1 / 2;
+    z-index: 2;
+}
+
+
+
+.input-field{
+    max-width: 280px;
+    width: 100%;
+    background-color: #f0f0f0;
+    margin: 10px 0;
+    height: 55px;
+    border-radius: 55px;
+    display: grid;
+    padding: 0 0.4rem;
+    position: relative;
+}
+
+    .input-field input {
+        background: none;
+        outline: none;
+        border: none;
+        line-height: 1;
+        font-weight: 600;
+        font-size: 1.1rem;
+        color: var(--color-primary);
+        padding: 0 0 0 1.2rem;
+    }
+
+.btn {
+    width: 180px;
+    background-color: var(--color-primary);
+    border: none;
+    outline: none;
+    height: 49px;
+    border-radius: 49px;
+    color: #fff;
+    text-transform: uppercase;
+    font-weight: 600;
+    margin: 10px 0;
+    cursor: pointer;
+    transition: 0.5s;
+}
+
+.btn-trash {
+    width: 50px;
+    background-color: var(--color-primary);
+    border: none;
+    outline: none;
+    height: 49px;
+    border-radius: 10px;
+    margin-left: 25px;
+    color: #fff;
+    cursor: pointer;
+    transition: 0.5s;
+}
+
+    :where(.btn, .btn-trash):hover {
+        background-color: var(--color-secondary);
+    }
+
+    :where(.btn, .btn-trash).transparent {
+        margin: 0;
+        background: none;
+        border: 2px solid #fff;
+        width: 130px;
+        height: 41px;
+        font-weight: 600;
+        font-size: 0.8rem;
+    }
+
+.title {
+    font-size: 2.2rem;
+    color: var(--color-primary);
+    margin-bottom: 10px;
+    text-align: center;
+}
+
+.profile-pic {
+    float: left;
+}
+
+.panels-container {
+    position: fixed;
+    height: 100%;
+    width: 100%;
+    top: 0;
+    left: 0;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    margin-left: 600px;
+}
+
+.right-panel {
+    pointer-events: none;
+    padding: 3rem 12% 2rem 17%;
+}

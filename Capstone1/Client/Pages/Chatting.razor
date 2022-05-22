@@ -1,0 +1,241 @@
+﻿@page "/message/{id:int}"
+@inject IChatService ChatService
+@inject IAuthService AuthService
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
+@implements IAsyncDisposable
+@attribute [Authorize]
+
+<PageTitle>@recipientFullName</PageTitle>
+
+@if(Id == checkUserId)
+{
+	<span>You can't message yourself</span>
+}
+else
+{
+	<div id="chatScroll" style="overflow-x:hidden; overflow-y:auto; height: 500px;">
+		<div class="chat">
+			<div class="chat-box">
+				@if(ChatService.Chats != null && ChatService.Chats.Count > 0)
+				{
+					<Virtualize Items="ChatService.Chats" Context="message">
+						@if (firstNewMessage != null && message.Id == firstNewMessage.Id)
+						{
+							<div class="justify-content-center text-center text-warning">@newMessagesCount Unread Messages</div>
+						}
+						@if(MessageLocation(message))
+						{
+							<div class="chat-l">
+								<div class="mess">
+									<p>
+										@message.Message
+									</p>
+									<div class="check">
+										<span>@message.DateSent.ToLocalTime()</span>
+										<img src="./check-2.png">
+									</div>
+								</div>
+								<div class="sp"></div>
+							</div>
+						}
+						else
+						{
+							<div class="chat-r">
+								<div class="sp"></div>
+								<div class="mess mess-r">
+									<p>
+										@message.Message
+									</p>
+									<div class="check">
+										<span>@message.DateSent.ToLocalTime()</span>
+										@if (message.IsNew)
+										{
+											<img src="./check-1.png">
+										}
+										else
+										{
+											<img src="./check-2.png">
+										}
+									</div>
+								</div>
+							</div>
+						}
+					</Virtualize>
+				}
+			</div>
+		</div>
+	</div>
+
+	<hr />
+
+	<EditForm Model="chat" OnValidSubmit="SendMessage">
+		<DataAnnotationsValidator></DataAnnotationsValidator>
+		<div class="input-group">
+	
+			<input @bind-value="chat.Message"
+			@bind-value:event="oninput" @onkeyup="ForTyping" class="form-control" @ref="messageInput"></input>
+
+			<button type="submit" class="btn btn-primary form-group-append">
+				<i class="oi oi-caret-right"></i>
+			</button>
+		</div>
+		<ValidationSummary></ValidationSummary>
+	</EditForm>
+}
+
+@code {
+	[Parameter]
+	public int Id { get; set; }
+
+	private HubConnection? hubConnection;
+
+	Chat chat = new Chat();
+	Chat? firstNewMessage = null;
+	int checkUserId = 0;
+	string uniqueGroupName = "";
+	int newMessagesCount = 0;
+	string recipientFullName = string.Empty;
+	protected ElementReference messageInput;
+
+	protected override async Task OnInitializedAsync()
+	{
+		checkUserId = await AuthService.GetCurrentUserId();
+		recipientFullName = await AuthService.GetUserFullName(Id);
+
+		hubConnection = new HubConnectionBuilder()
+			.WithUrl(NavigationManager.ToAbsoluteUri("/chathub"))
+			.Build();
+
+		hubConnection.On<Chat>("Send", async (message) =>
+		{
+			ChatService.Chats.Add(message);
+			await JSRuntime.InvokeVoidAsync("scrollToBottom");
+			await ChatService.ChangeIsNewOfChat(Id);
+			await hubConnection.SendAsync("ChatButtonColor", checkUserId);
+			await hubConnection.SendAsync("MessagesSeen", Id);
+			StateHasChanged();
+		});
+
+		hubConnection.On<int>("IsNewMessages", (recipientId) =>
+		{
+			if(checkUserId == recipientId)
+			{
+				if(ChatService.Chats != null && ChatService.Chats.Count > 0)
+				{
+					foreach (var chat in ChatService.Chats)
+					{
+						chat.IsNew = false;
+					}
+				}
+				StateHasChanged();
+			}
+		});
+
+		await hubConnection.StartAsync();
+	}
+
+	protected override async Task OnParametersSetAsync()
+	{
+		await ChatService.GetMessagesBetweenLoggedUserAndAnother(Id);
+		await ChatService.ChangeIsNewOfChat(Id);
+		if(hubConnection != null)
+		{
+			await hubConnection.SendAsync("MessagesSeen", Id);
+			await hubConnection.SendAsync("ChatButtonColor", checkUserId);
+
+			if(checkUserId < Id)
+			{
+				uniqueGroupName = checkUserId + "_" + Id;
+			}
+			else
+			{
+				uniqueGroupName = Id + "_" + checkUserId;
+			}
+			await hubConnection.SendAsync("JoinGroup", "chat_" + uniqueGroupName);
+		}
+	}
+
+	async Task SendMessage()
+	{
+		if (!chat.Message.Equals(""))
+		{
+			chat.RecipientId = Id;
+			chat.SenderId = checkUserId;
+			await ChatService.SendMessage(chat);
+			if(checkUserId < Id)
+			{
+				uniqueGroupName = checkUserId + "_" + Id;
+			}
+			else
+			{
+				uniqueGroupName = Id + "_" + checkUserId;
+			}
+			if(hubConnection != null)
+			{
+				await hubConnection.SendAsync("AddToGroup", "chat_" + uniqueGroupName, chat);
+				await hubConnection.SendAsync("ChatButtonColor", chat.RecipientId);
+			}
+			chat.Message = "";
+			firstNewMessage = null;
+		}
+	}
+
+	//message received then return true chat-l
+	public bool MessageLocation(Chat message)
+	{
+		if(message.SenderId == Id)
+		{
+			return true;
+		}
+
+		return false;
+	}
+
+
+	protected override async Task OnAfterRenderAsync(bool firstRender)
+	{
+		if (firstRender)
+		{
+			await messageInput.FocusAsync();
+			firstNewMessage = await ChatService.GetFirstNewReceivedMessage(Id);
+			newMessagesCount = await ChatService.GetNewReceivedMessagesCountBetweenLoggedUserAndAnother(Id);
+		}
+		if(Id != checkUserId)
+		{
+			await JSRuntime.InvokeVoidAsync("scrollToBottom");
+			JSRuntime.InvokeVoidAsync("scrollToBottomOnInitialize");
+		}
+
+		//await ChatService.ChangeIsNewOfChat(Id);
+		//if(hubConnection != null)
+		//{
+		//	await hubConnection.SendAsync("ChatButtonColor", checkUserId);
+		//	await hubConnection.SendAsync("MessagesSeen", Id);
+		//}
+	}
+
+	public async ValueTask DisposeAsync()
+	{
+		if(hubConnection != null)
+		{
+			await hubConnection.SendAsync("ForTyping", checkUserId, Id, false);
+			await hubConnection.DisposeAsync();
+		}
+	}
+
+	public async void ForTyping()
+	{
+		if(hubConnection != null)
+		{
+			if (chat.Message.Equals(""))
+			{
+				await hubConnection.SendAsync("ForTyping", checkUserId, Id, false);
+			}
+			else
+			{
+				await hubConnection.SendAsync("ForTyping", checkUserId, Id, true);
+			}
+		}
+	}
+}

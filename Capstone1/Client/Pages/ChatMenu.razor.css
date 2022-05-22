@@ -1,0 +1,11 @@
+﻿body {
+}
+
+a{
+    color: darkblue;
+    text-decoration: underline;
+}
+
+    a:hover {
+        color: var(--color-tertiary);
+    }

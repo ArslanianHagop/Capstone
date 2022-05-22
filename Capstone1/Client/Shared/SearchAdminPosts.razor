@@ -1,0 +1,62 @@
+﻿@inject NavigationManager NavigationManager
+@inject IPostService PostService
+
+<div class="input-group">
+	<input  @bind-value="searchText"
+			@bind-value:event="oninput"
+			type="search"
+			list="adminPosts"
+			@onkeyup="HandleSearch"
+			class="form-control"
+			placeholder="Search Admin Posts..."
+			@ref="searchInput" />
+	<datalist id="adminPosts">
+		@foreach (var suggestion in suggestions)
+		{
+			<option>@suggestion</option>
+		}
+	</datalist>
+	<div class="input-group-append">
+		<button class="btn btn-primary" @onclick="SearchAdminPost">
+			<span class="oi oi-magnifying-glass"></span>
+		</button>
+	</div>
+</div>
+
+@code {
+	private string searchText = string.Empty;
+	private List<string> suggestions = new List<string>();
+	protected ElementReference searchInput;
+
+	protected override async Task OnAfterRenderAsync(bool firstRender)
+	{
+		if (firstRender)
+		{
+			await searchInput.FocusAsync();
+		}
+	}
+
+	public void SearchAdminPost()
+	{
+		if (searchText.Equals(string.Empty))
+		{
+			PostService.LastSearchText = "";
+			NavigationManager.NavigateTo("admin/posts/1");
+		}
+		else
+		{
+			NavigationManager.NavigateTo($"admin/posts/search/{searchText}/1");
+		}
+	}
+
+	public async Task HandleSearch(KeyboardEventArgs args)
+	{
+		if(args.Key == null || args.Key.Equals("Enter"))
+		{
+			SearchAdminPost();
+		}else if(searchText.Length > 1)
+		{
+			suggestions = await PostService.AdminGetPostSearchSuggestions(searchText);
+		}
+	}
+}

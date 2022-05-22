@@ -1,0 +1,122 @@
+﻿@page "/users/{page:int}"
+@page "/users/search/{searchText}/{page:int}"
+@inject IAuthService AuthService
+@inject ITeacherService TeacherService
+@inject IStudentService StudentService
+@inject IInterestService InterestService
+@inject ILanguageService LanguageService
+@implements IDisposable
+@attribute [Authorize]
+
+<PageTitle>Find Users</PageTitle>
+
+<SearchUsers />
+
+<table class="table">
+	<thead>
+		<tr>
+			<th>Name</th>
+			<th>Role</th>
+			<th>Languages</th>
+			<th>Interests</th>
+		</tr>
+	</thead>
+	<tbody>
+		@if(AuthService.Users != null && AuthService.Users.Count != 0)
+		{
+			<Virtualize Items="AuthService.Users" Context="user">
+				<tr>
+					<td><a href=@(user.Role.Equals("Teacher") ? $"/teacher_profile/{user.Id}" : $"/student_profile/{user.Id}/1")>@user.FirstName @user.LastName</a></td>
+					<td>@user.Role</td>
+					<td>
+						@if(userLanguages != null && userLanguages.Count > 0)
+						{
+							@foreach (var userLanguage in userLanguages.Where(ul => ul.UserId == user.Id))
+							{
+								<div class="mb-3">
+									@foreach (var language in LanguageService.Languages)
+									{
+										if(userLanguage.LanguageId == language.Id)
+										{
+											<span>@language.Name</span>
+										}
+									}
+								</div>
+							}
+						}
+					</td>
+					<td>
+						@if ((user.Role).Equals("Teacher"))
+						{
+							@if(teacherInterests != null && teacherInterests.Count != 0)
+							{	
+								@foreach (var teacherInterest in teacherInterests.Where(ti => ti.TeacherId == user.Id))
+									{
+										<span>@InterestService.Interests.Find(i => i.Id == teacherInterest.InterestId).Name</span>
+										<br />
+									}
+						}
+					}else if ((user.Role).Equals("Student"))
+					{
+						@if(studentInterests != null && studentInterests.Count != 0)
+						{
+							@foreach (var studentInterest in studentInterests.Where(ti => ti.StudentId == user.Id))
+								{
+									<span>@InterestService.Interests.Find(i => i.Id == studentInterest.InterestId).Name</span>
+									<br />
+								}
+							}
+						}
+					</td>
+				</tr>
+			</Virtualize>
+		}
+	</tbody>
+</table>
+
+@for (var i = 1; i <= AuthService.PageCount; i++)
+{
+	<a class="btn @(i == AuthService.CurrentPage ? "btn-info" : "btn-outline-info") page-selection"
+				href=@((SearchText == null || SearchText.Equals("")) ? $"users/{i}" : $"users/search/{SearchText}/{i}")>@i</a>
+}
+
+@code {
+
+	[Parameter]
+	public int Page { get; set; } = 1;
+
+	[Parameter]
+	public string? SearchText { get; set; } = null;
+
+	List<UserLanguage> userLanguages = new List<UserLanguage>();
+	List<StudentInterest> studentInterests = new List<StudentInterest>();
+	List<TeacherInterest> teacherInterests = new List<TeacherInterest>();
+
+	protected override async Task OnInitializedAsync()
+	{
+		AuthService.Users = new List<User>();
+		AuthService.UsersChanged += StateHasChanged;
+	}
+
+	public void Dispose()
+	{
+		AuthService.UsersChanged -= StateHasChanged;
+	}
+
+	protected override async Task OnParametersSetAsync()
+	{
+		if(SearchText == null || SearchText.Equals(""))
+		{
+			await AuthService.GetUsersPaginated(Page);
+		}
+		else
+		{
+			await AuthService.SearchUsers(SearchText, Page);
+		}
+		await InterestService.GetInterests();
+		await LanguageService.GetLanguages();
+		userLanguages = await AuthService.GetAllUserLanguages();
+		teacherInterests = await TeacherService.GetAllTeacherInterests();
+		studentInterests = await StudentService.GetAllStudentInterests();
+	}
+}

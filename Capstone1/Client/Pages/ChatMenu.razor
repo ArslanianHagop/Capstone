@@ -1,0 +1,165 @@
+﻿@page "/chatMenu/{page:int}"
+@page "/chatMenu/search/{searchText}/{page:int}"
+@inject IAuthService AuthService
+@inject IChatService ChatService
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
+@implements IDisposable
+@implements IAsyncDisposable
+
+<PageTitle>Chat Menu</PageTitle>
+
+<SearchChatUsers />
+
+<table class="table">
+	<thead>
+		<tr>
+			<th>Name</th>
+			<th>Last Message</th>
+			<th></th>
+		</tr>
+	</thead>
+	<tbody>
+		@if(ChatService.LoggedInUsersChatsUsers != null && ChatService.LoggedInUsersChatsUsers.Count > 0)
+		{
+			<Virtualize Items="ChatService.LoggedInUsersChatsUsers" Context="user">
+				<tr class=@(senderIds.Contains(user.Id) ? "text-primary" : "")>
+					<td><a href=@(user.Role.Equals("Teacher") ? $"/teacher_profile/{user.Id}" : $"/student_profile/{user.Id}/1")>@user.FirstName @user.LastName</a> &emsp; <a href="/message/@user.Id">Messages</a></td>
+					<td>@(loggedInUsersChatsLastMessages.FirstOrDefault(i => i.Key == user.Id).Value)</td>
+					<td>
+						@if (user.Typing)
+						{
+							<span style="color: green;">typing...</span>
+						}
+					</td>
+				</tr>
+			</Virtualize>
+		}
+	</tbody>
+</table>
+
+@for (var i = 1; i <= Math.Ceiling((double)usersCount / 5); i++)
+{
+	<a class="btn @(i == Page ? "btn-info" : "btn-outline-info") page-selection"
+				href=@((SearchText == null || SearchText.Equals("")) ? $"chatMenu/{i}" : $"chatMenu/search/{SearchText}/{i}")>@i</a>
+}
+
+@code {
+	[Parameter]
+	public int Page { get; set; } = 1;
+
+	[Parameter]
+	public string? SearchText { get; set; } = null;
+
+	private HubConnection? hubConnection;
+
+	Dictionary<int, string> loggedInUsersChatsLastMessages = new Dictionary<int, string>();
+	List<Chat> recipientChats = new List<Chat>();
+	List<int> senderIds = new List<int>();
+	int usersCount = 0;
+	int currentUserId = 0;
+
+	protected override async Task OnInitializedAsync()
+	{
+		currentUserId = await AuthService.GetCurrentUserId();
+		loggedInUsersChatsLastMessages = await ChatService.GetLoggedInUsersChatsLastMessages();
+		var recipientChatsService = await ChatService.GetLoggedInUsersReceivedMessages();
+		if (recipientChatsService.Success)
+		{
+			recipientChats = recipientChatsService.Data;
+			foreach (var recipientChat in recipientChats)
+			{
+				if (recipientChat.IsNew && !senderIds.Contains(recipientChat.SenderId))
+				{
+					senderIds.Add(recipientChat.SenderId);
+				}
+			}
+		}
+		else
+		{
+			recipientChats = new List<Chat>();
+		}
+		ChatService.ChatChanged += StateHasChanged;
+
+		hubConnection = new HubConnectionBuilder()
+			.WithUrl(NavigationManager.ToAbsoluteUri("/chathub"))
+			.Build();
+
+		hubConnection.On<Chat>("IsNew", async (message) =>
+		{
+			if(message.RecipientId == currentUserId)
+			{
+				loggedInUsersChatsLastMessages = await ChatService.GetLoggedInUsersChatsLastMessages();
+				var recipientChatsService = await ChatService.GetLoggedInUsersReceivedMessages();
+				if (recipientChatsService.Success)
+				{
+					recipientChats = recipientChatsService.Data;
+					foreach (var recipientChat in recipientChats)
+					{
+						if (recipientChat.IsNew && !senderIds.Contains(recipientChat.SenderId))
+						{
+							senderIds.Add(recipientChat.SenderId);
+						}
+					}
+				}
+				else
+				{
+					recipientChats = new List<Chat>();
+				}
+				if(SearchText == null || SearchText.Equals(""))
+				{
+					await ChatService.GetLoggedInUsersChatsUsersPaginated(Page);
+				}
+				else
+				{
+					await ChatService.GetLoggedInUsersSearchedChatsUsers(SearchText, Page);
+				}
+				StateHasChanged();
+			}
+		});
+
+		await hubConnection.StartAsync();
+		await hubConnection.SendAsync("ChatButtonColor", currentUserId);
+	}
+
+	public void Dispose()
+	{
+		ChatService.ChatChanged -= StateHasChanged;
+	}
+
+	protected override async Task OnParametersSetAsync()
+	{
+		if(SearchText == null || SearchText.Equals(""))
+		{
+			await ChatService.GetLoggedInUsersChatsUsersPaginated(Page);
+			usersCount = loggedInUsersChatsLastMessages.Count;
+		}
+		else
+		{
+			await ChatService.GetLoggedInUsersSearchedChatsUsers(SearchText, Page);
+			usersCount = await ChatService.GetLoggedInUsersSearchedChatsUsersCount(SearchText);
+		}
+
+		hubConnection = new HubConnectionBuilder()
+			.WithUrl(NavigationManager.ToAbsoluteUri("/chathub"))
+			.Build();
+
+		hubConnection.On<int, int, bool>("typing", (senderId, recipientId, typingFlag) =>
+		{
+			if(recipientId == currentUserId && ChatService.LoggedInUsersChatsUsers.Any(u => u.Id == senderId)){
+				ChatService.LoggedInUsersChatsUsers.Find(u => u.Id == senderId).Typing = typingFlag;
+				StateHasChanged();
+			}
+		});
+
+		await hubConnection.StartAsync();
+	}
+
+	public async ValueTask DisposeAsync()
+	{
+		if(hubConnection != null)
+		{
+			await hubConnection.DisposeAsync();
+		}
+	}
+}

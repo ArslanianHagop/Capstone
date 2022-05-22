@@ -1,0 +1,111 @@
+﻿@page "/admin/posts/{page:int}"
+@page "/admin/posts/search/{searchText}/{page:int}"
+@inject IPostService PostService
+@inject IInterestService InterestService
+@inject ITeacherService TeacherService
+@inject NavigationManager NavigationManager
+@inject IProposalService ProposalService
+@inject ILocalStorageService LocalStorage
+@implements IDisposable
+@attribute [Authorize(Roles = "Admin")]
+
+<PageTitle>Admin posts</PageTitle>
+
+<SearchAdminPosts />
+
+@if (PostService.AdminPosts == null || PostService.AdminPosts.Count == 0)
+{
+	<span>@PostService.Message</span>
+}
+else
+{
+	<ul class="list-unstyled">
+		@foreach (var post in PostService.AdminPosts)
+		{
+			<li>
+				<div class="container">
+					<div class="post">
+						<div class="post-details">
+
+							<img src="@authorsProfilePics.FirstOrDefault(a => a.Key == post.Id).Value">
+
+							<div class="icon-text">
+								<h2 class="text"><a class="post-title-styling" href="/student_profile/@post.StudentId/1">@authors.FirstOrDefault(a => a.Key == post.Id).Value</a></h2>
+							</div>
+
+							@if(postInterests != null && postInterests.Count > 0)
+							{
+								@foreach (var postInterest in postInterests.Where(pi => pi.PostId == post.Id))
+								{
+									<div class="icon-text">
+										<span>@InterestService.Interests.Find(i => i.Id == postInterest.InterestId).Name&ensp;</span>
+									</div>
+								}
+							}
+						</div>
+
+						<h2>
+							<a class="post-title-styling" href="/student/post/@post.Id">
+								@post.Title
+							</a>
+						</h2>
+
+						<p>
+							@post.Description
+						</p>
+
+						<div class="post-cta">
+							Budget: @post.Budget$/1hr
+						</div>
+					</div>
+				</div>
+				<hr />
+			</li>
+		}
+	</ul>
+	for (var i = 1; i <= PostService.PageCount; i++)
+	{
+		<a class="btn @(i == PostService.CurrentPage ? "btn-info" : "btn-outline-info") page-selection"
+					href=@((SearchText == null || SearchText.Equals("")) ? $"/admin/posts/{i}" : $"/admin/posts/search/{SearchText}/{i}")>@i</a>
+	}
+}
+
+@code {
+	[Parameter]
+	public int Page { get; set; } = 1;
+
+	[Parameter]
+	public string? SearchText { get; set; } = null;
+
+	List<PostInterest> postInterests = new List<PostInterest>();
+	List<Interest> allInterests = new List<Interest>();
+	Dictionary<int, string> authors = new Dictionary<int, string>();
+	Dictionary<int, string> authorsProfilePics = new Dictionary<int, string>();
+
+	protected override async Task OnInitializedAsync()
+	{
+		PostService.PostsChanged += StateHasChanged;
+		await InterestService.GetInterests();
+		authors = await PostService.GetPostsAuthors();
+		authorsProfilePics = await PostService.GetPostsAuthorsProfilePics();
+		postInterests = await PostService.GetAllPostInterests();
+	}
+
+	protected override async Task OnParametersSetAsync()
+	{
+		if(SearchText == null || SearchText.Equals(""))
+		{
+			await PostService.AdminGetPostsPaginated(Page);
+		}
+		else
+		{
+			await PostService.AdminSearchPosts(SearchText, Page);
+		}
+	}
+
+	public void Dispose()
+	{
+		PostService.PostsChanged -= StateHasChanged;
+	}
+
+}

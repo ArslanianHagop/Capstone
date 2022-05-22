@@ -1,0 +1,63 @@
+﻿body {
+}
+
+.container {
+    margin: 2rem auto;
+    width: 80%;
+}
+
+.post {
+    background-color: #fff;
+    box-shadow: 0 0 2.5rem rgb(0, 0, 0, 0.28);
+    border-radius: 20px;
+    padding: 2rem;
+}
+
+.post-details, .icon-text {
+    display: flex;
+    align-items: center;
+}
+
+.post-cta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.post-author {
+    font-weight: bold;
+    color: var(--color-primary);
+}
+
+    .post-author:hover {
+        color: blue;
+        text-decoration: underline;
+    }
+
+.proposal-button {
+    width: 150px;
+    background-color: var(--color-primary);
+    border: none;
+    outline: none;
+    height: 49px;
+    border-radius: 49px;
+    color: #fff;
+    text-transform: uppercase;
+    font-size: 12px;
+    font-weight: 600;
+    margin: 10px 0;
+    cursor: pointer;
+    transition: 0.5s;
+}
+
+    .proposal-button:hover {
+        background-color: var(--color-secondary);
+    }
+
+.toMessage{
+    color: blue;
+}
+
+    .toMessage:hover{
+        text-decoration: underline;
+    }

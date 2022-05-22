@@ -1,0 +1,10 @@
+﻿body {
+}
+
+.toMessage{
+    color: blue;
+}
+
+    .toMessage:hover{
+        text-decoration: underline;
+    }

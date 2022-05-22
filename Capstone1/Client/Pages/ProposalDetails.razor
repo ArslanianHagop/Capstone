@@ -1,0 +1,141 @@
+﻿@page "/proposalDetails/{studentId:int}/{proposalId:int}"
+@inject IProposalService ProposalService
+@inject IAuthService AuthService
+@inject IPostService PostService
+@inject NavigationManager NavigationManager
+@implements IAsyncDisposable
+@attribute [Authorize]
+
+<PageTitle>Proposal Details</PageTitle>
+
+
+@if(StudentId == currentUserId || isAdmin)
+{
+	<div class="acceptance-message">
+		@if (postIsAccepted)
+		{
+			<h5 class="text-success">You have accepted this proposal for this post</h5>
+		}
+		else
+		{
+			<p>By accepting the proposal, your post will be deleted and you will send a message via our chat to @fullName</p>
+		}
+	</div>
+	<hr />
+	@if(proposal == null)
+	{
+		<span>@message</span>
+	}
+	else
+	{
+		<div class="container">
+			<div class="post">
+				<div class="contents">
+
+					<p class="post-description">
+						Proposal Description: <strong>@proposal.Description</strong>
+					</p>
+
+					<div class="post-cta">
+						Budget: <strong>@proposal.Budget$/1hr</strong>
+					</div>
+					<br />
+					<h3 style="font-weight: normal;">
+						Proposal made by <strong>@fullName</strong>
+					</h3>
+					<br />
+					<h3 style="font-weight: normal;">
+						Proposal made on <strong>@proposal.DateCreated</strong>
+					</h3>
+					<br />
+					<h5>
+						<a href="/message/@proposal.TeacherId">Message @fullName</a>
+						@if(!postIsAccepted)
+						{
+							<button class="btn btn-primary float-end" @onclick="AcceptProposal">Accept Proposal</button>
+						}
+					</h5>
+				</div>
+			</div>
+		</div>
+	}
+}
+
+@code {
+
+	[Parameter]
+	public int ProposalId { get; set; }
+
+	[Parameter]
+	public int StudentId { get; set; }
+
+	private HubConnection? hubConnection;
+
+	private Proposal proposal = null;
+	private string message = string.Empty;
+	private string fullName = string.Empty;
+	private int currentUserId = 0;
+	private bool isAdmin = false;
+	private bool postIsAccepted = true;
+
+	protected override async Task OnParametersSetAsync()
+	{
+		currentUserId = await AuthService.GetCurrentUserId();
+		isAdmin = await AuthService.IsAdmin();
+		message = "Loading proposal...";
+
+		var result = await ProposalService.GetProposal(ProposalId);
+
+		if (!result.Success)
+		{
+			message = result.Message;
+		}
+		else
+		{
+			proposal = result.Data;
+		}
+
+		if(proposal != null)
+		{
+			fullName = await ProposalService.GetTeacherName(proposal.TeacherId);
+		}
+
+		postIsAccepted = await PostService.GetPostsIsAccepted(proposal.PostId);
+
+		hubConnection = new HubConnectionBuilder()
+			.WithUrl(NavigationManager.ToAbsoluteUri("/chathub"))
+			.Build();
+
+		await hubConnection.StartAsync();
+	}
+
+	private async Task AcceptProposal()
+	{
+		var uniqueGroupName = "";
+		var chat = await ProposalService.AcceptProposal(ProposalId);
+
+		if(currentUserId < proposal.TeacherId)
+		{
+			uniqueGroupName = currentUserId + "_" + proposal.TeacherId;
+		}
+		else
+		{
+			uniqueGroupName = proposal.TeacherId + "_" + currentUserId;
+		}
+		if(hubConnection != null)
+		{
+			await hubConnection.SendAsync("JoinGroup", "chat_" + uniqueGroupName);
+			await hubConnection.SendAsync("AddToGroup", "chat_" + uniqueGroupName, chat);
+			await hubConnection.SendAsync("ChatButtonColor", chat.RecipientId);
+		}
+		NavigationManager.NavigateTo($"/message/{proposal.TeacherId}");
+	}
+
+	public async ValueTask DisposeAsync()
+	{
+		if(hubConnection != null)
+		{
+			await hubConnection.DisposeAsync();
+		}
+	}
+}

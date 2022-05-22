@@ -1,0 +1,177 @@
+﻿@page "/profile/student/{page:int}"
+@inject IAuthService AuthService
+@inject IInterestService InterestService
+@inject IStudentService StudentService
+@inject IPostService PostService
+@inject IProposalService ProposalService
+@inject NavigationManager NavigationManager
+@attribute [Authorize(Roles = "Student")]
+
+<PageTitle>Edit Student Profile</PageTitle>
+
+<button class="float-end btn btn-primary" @onclick="GoToMessageAdmin">Message the admin with your recommendations</button>
+<EditForm Model="student" OnValidSubmit="ChangeInterests">
+	<DataAnnotationsValidator></DataAnnotationsValidator>
+	@if(student.StudentInterests != null && student.StudentInterests.Count != 0)
+	{
+		@foreach (var studentInterest in student.StudentInterests)
+		{
+			<div class="row">
+				<div class="col mb-3">
+					<InputSelect @bind-Value="studentInterest.InterestId" class="form-control">
+						@foreach (var interest in InterestService.Interests)
+						{
+							<option value="@interest.Id.ToString()">@interest.Name</option>
+						}
+					</InputSelect>
+				</div>
+				<div class="col mb-3">
+					<button type="button" class="btn btn-primary" @onclick="(() => RemoveInterest(studentInterest.InterestId))">
+						<i class="oi oi-trash"></i>
+					</button>
+				</div>
+			</div>
+		}
+	}
+	<button type="button" class="btn btn-primary" @onclick="AddInterest">
+		<i class="oi oi-plus"></i> Add Interest
+	</button>
+	<br />
+	<br />
+	<button type="submit" class="btn btn-primary">Update Interests</button>
+	<div class="@messageCssClass">
+		<span>@message</span>
+	</div>
+	<hr />
+</EditForm>
+
+<button class="btn btn-primary float-end" @onclick="CreatePost">
+	<i class="oi oi-plus"></i> Add a new post
+</button>
+
+<table class="table">
+	<thead>
+		<tr>
+			<th>Post Title</th>
+			<th>Course type</th>
+			<th>Budget</th>
+			<th>Edit?</th>
+			<th>Proposals Count</th>
+			<th></th>
+		</tr>
+	</thead>
+	<tbody>
+		@if(posts != null && postsCount != 0)
+		{
+			<Virtualize Items="posts" Context="post">
+				<tr style="background-color: @(post.IsAccepted ? "lightgreen" : "white")">
+					<td>@post.Title</td>
+					<td>
+						@if(postInterests != null && postInterests.Count > 0)
+						{
+							@foreach (var postInterest in postInterests.Where(pi => pi.PostId == post.Id))
+							{
+								<span>@InterestService.Interests.Find(i => i.Id == postInterest.InterestId).Name</span>
+								<br />
+							}
+						}
+					</td>
+					<td>@post.Budget$/1hr</td>
+					<td>
+						@if(!post.IsAccepted)
+						{
+							<button class="btn btn-primary" @onclick="(() => EditPost(post.Id))">
+								<i class="oi oi-pencil"></i>
+							</button>
+						}
+					</td>
+					<td>@proposals.Where(p => p.PostId == post.Id).ToList().Count</td>
+					<td><a class="btn btn-primary" href="/PostsProposals/@post.Id/1">Proposals</a></td>
+				</tr>
+			</Virtualize>
+		}
+	</tbody>
+</table>
+
+<div class="float-end">
+	@for (var i = 1; i <= Math.Ceiling((double)postsCount / 5); i++)
+	{
+		<a class="btn @(i == Page ? "btn-info" : "btn-outline-info") page-selection"
+					href=@PostsPagination(i)>@i</a>
+	}
+</div>
+
+@code {
+
+	[Parameter]
+	public int Page { get; set; } = 1;
+
+	Student student = new Student();
+	List<PostInterest> postInterests = new List<PostInterest>();
+	List<Post> posts = new List<Post>();
+	int postsCount = 0;
+	List<Proposal> proposals = new List<Proposal>();
+	string message = string.Empty;
+	string messageCssClass = string.Empty;
+
+	protected override async Task OnInitializedAsync()
+	{
+		await InterestService.GetInterests();
+		postInterests = await PostService.GetAllPostInterests();
+		student.StudentInterests = await StudentService.GetLoggedInStudentsInterests();
+		postsCount = await PostService.GetLoggedInStudentsPostsCount();
+		proposals = await ProposalService.GetAllProposals();
+	}
+
+	protected override async Task OnParametersSetAsync()
+	{
+		posts = await PostService.GetLoggedInStudentsPostsPaginated(Page);
+	}
+
+	string PostsPagination(int i)
+	{
+		return $"/profile/student/{i}";
+	}
+
+	async void ChangeInterests()
+	{
+		var result = await StudentService.ChangeInterests(student);
+		message = result.Message;
+		if (result.Success)
+			messageCssClass = "text-success";
+		else
+			messageCssClass = "text-danger";
+		StateHasChanged();
+	}
+
+	void RemoveInterest(int interestId)
+	{
+		var interest = student.StudentInterests.Find(i => i.InterestId == interestId);
+		if (interest == null)
+		{
+			return;
+		}
+
+		student.StudentInterests.Remove(interest);
+	}
+
+	void AddInterest()
+	{
+		student.StudentInterests.Add(new StudentInterest { });
+	}
+
+	void CreatePost()
+	{
+		NavigationManager.NavigateTo("student/post");
+	}
+
+	void EditPost(int postId)
+	{
+		NavigationManager.NavigateTo($"student/post/{postId}");
+	}
+
+	async Task GoToMessageAdmin()
+	{
+		NavigationManager.NavigateTo($"/message/{await AuthService.GetFirstAdminId()}");
+	}
+}

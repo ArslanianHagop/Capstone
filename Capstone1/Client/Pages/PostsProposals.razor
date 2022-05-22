@@ -1,0 +1,136 @@
+﻿@page "/PostsProposals/{postId:int}/{page:int}"
+@inject IPostService PostService
+@inject IInterestService InterestService
+@inject IProposalService ProposalService
+@inject IAuthService AuthService
+
+<PageTitle>Posts Proposals</PageTitle>
+
+@if(post.StudentId == currentUserId || isAdmin)
+{
+	<div class="container">
+		<div class="post">
+			<div class="post-details">
+				@if(postsInterests != null && postsInterests.Count > 0)
+				{
+					@foreach (var postInterest in postsInterests)
+					{
+						<span>@InterestService.Interests.Find(i => i.Id == postInterest.InterestId).Name &nbsp</span>
+						<br />
+					}
+				}
+			</div>
+
+			<h2>
+				<a class="post-title-styling" href="/post/@post.Id">
+					@post.Title
+				</a>
+			</h2>
+
+			<p>
+				@post.Description
+			</p>
+
+			<div class="post-cta">
+				Budget: @post.Budget$/1hr
+
+				@if (post.IsAccepted)
+				{
+					<h3 class="text-success">This post has accepted a proposal</h3>
+				}
+			</div>
+		</div>
+	</div>
+	<hr />
+
+	<table class="table">
+		<thead>
+			<tr>
+				<th>Teacher Name</th>
+				<th>Teacher Email</th>
+				<th>Proposal Budget</th>
+				<th>Details</th>
+			</tr>
+		</thead>
+		<tbody>
+			@if(postsProposals != null && postsProposals.Count > 0)
+			{
+				<Virtualize Items="postsProposals" Context="proposal">
+					<tr style="background-color: @(proposal.IsAccepted ? "lightgreen" : "white")">
+						<td><a class="btn btn-primary" href="/teacher_profile/@proposal.TeacherId">@fullNames[proposal.Id]</a></td>
+						<td>@emails[proposal.Id]</td>
+						<td>@proposal.Budget$\1hr</td>
+						<td>
+							<a class="btn btn-primary" href="/proposalDetails/@post.StudentId/@proposal.Id">Details</a>
+						</td>
+					</tr>
+				</Virtualize>
+			}
+		</tbody>
+	</table>
+
+	<div class="float-end">
+		@for (var i = 1; i <= Math.Ceiling((double)postsProposalsCount / 2); i++)
+		{
+			<a class="btn @(i == Page ? "btn-info" : "btn-outline-info") page-selection"
+						href=@PostsProposalsPagination(i)>@i</a>
+		}
+	</div>
+}
+
+@code {
+
+	[Parameter]
+	public int PostId { get; set; }
+
+	[Parameter]
+	public int Page { get; set; } = 1;
+
+	Post post = new Post();
+	bool isAdmin = false;
+	List<PostInterest> postsInterests = new List<PostInterest>();
+	List<Proposal> postsProposals = new List<Proposal>();
+	int postsProposalsCount = 0;
+	Dictionary<int, string> fullNames = new Dictionary<int, string>();
+	Dictionary<int, string> emails = new Dictionary<int, string>();
+	int currentUserId = 0;
+
+	protected override async Task OnInitializedAsync()
+	{
+		isAdmin = await AuthService.IsAdmin();
+		postsProposalsCount = await ProposalService.GetPostsProposalsCount(PostId);
+		await InterestService.GetInterests();
+	}
+
+	protected override async Task OnParametersSetAsync()
+	{
+		currentUserId = await AuthService.GetCurrentUserId();
+		postsInterests = await PostService.GetPostsInterests(PostId);
+		post = (await PostService.GetPost(PostId)).Data;
+		var postProposals = await ProposalService.GetPostsProposalsPaginated(PostId, Page);
+		if (postProposals.Success)
+		{
+			postsProposals = (await ProposalService.GetPostsProposalsPaginated(PostId, Page)).Data;
+		}
+		else
+		{
+			postsProposals = new List<Proposal>();
+		}
+
+		foreach (var postsProposal in postsProposals)
+		{
+			if(!fullNames.ContainsKey(postsProposal.Id))
+				fullNames.Add(postsProposal.Id, await ProposalService.GetTeacherName(postsProposal.TeacherId));
+		}
+		foreach (var postsProposal in postsProposals)
+		{
+			if(!emails.ContainsKey(postsProposal.Id))
+				emails.Add(postsProposal.Id, await ProposalService.GetTeacherEmail(postsProposal.TeacherId));
+		}
+	}
+
+	string PostsProposalsPagination(int i)
+	{
+		return $"/PostsProposals/{PostId}/{i}";
+	}
+}

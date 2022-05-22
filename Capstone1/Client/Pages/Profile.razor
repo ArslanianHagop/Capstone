@@ -1,0 +1,194 @@
+﻿@page "/profile"
+@using System.Security.Claims
+@inject IAuthService AuthService
+@inject ILanguageService LanguageService
+@attribute [Authorize]
+
+<PageTitle>Edit your profile</PageTitle>
+
+<AuthorizeView>
+	<h3 class="title">Hi! You're logged in with <i>@context.User.Identity.Name</i>.</h3>
+</AuthorizeView>
+<hr />
+<div class="profile-pic">
+	<label for="profilePic">Profile Picture</label>
+	<div class="mb-3">
+		<img src="@userChange.ProfilePic" style="width: 250px; height: 250px;" /> <br />
+		<InputFile OnChange="@HandleFileSelected"></InputFile>
+	</div>
+</div>
+<div class="container1">
+	<div class="forms-container1">
+		<div class="form1">
+			<EditForm Model="userChange" OnValidSubmit="ChangeUserProfile">
+				<DataAnnotationsValidator />
+				<label for="firstName">First Name</label>
+				<div class="input-field mb-3">
+					<input id="firstName" @bind-value="userChange.FirstName" />
+					<ValidationMessage For="@(() => userChange.FirstName)" />
+				</div>
+				<label for="lastName">Last Name</label>
+				<div class="input-field mb-3">
+					<input id="lastName" @bind-value="userChange.LastName" />
+					<ValidationMessage For="@(() => userChange.LastName)" />
+				</div>
+				<hr />
+				<div class="header">
+					<div class="col">Language</div>
+					<div class="col"></div>
+				</div>
+				@if(userChange.UserLanguages != null && userChange.UserLanguages.Count > 0)
+				{
+					@foreach (var userLanguage in userChange.UserLanguages)
+					{
+						<div class="row">
+							<div class="col mb-3">
+								<InputSelect @bind-Value="userLanguage.LanguageId" class="form-control">
+									@foreach (var language in LanguageService.Languages)
+									{
+										<option value="@language.Id.ToString()">@language.Name</option>
+									}
+								</InputSelect>
+							</div>
+							<div class="col">
+								<button type="button" class="btn-trash" @onclick="(() => RemoveLanguage(userLanguage.LanguageId))">
+									<i class="oi oi-trash"></i>
+								</button>
+							</div>
+						</div>
+					}
+				}
+				<button type="button" class="btn" @onclick="AddLanguage">
+					<i class="oi oi-plus"></i> Add Language
+				</button>
+				<hr />
+				<button type="submit" class="btn">Apply Profile Changes</button>
+			</EditForm>
+			<hr />
+			<button class="btn btn-dark" @onclick="NewPassword"><i class=@lockCss></i> Change your password</button>
+			@if (changePasswordButton)
+			{
+				if (changePasswordWall)
+				{
+					<h5>Change Password</h5>
+					<EditForm Model="request" OnValidSubmit="ChangePassword">
+						<DataAnnotationsValidator></DataAnnotationsValidator>
+						<label for="password">New Password</label>
+						<div class="mb-3 input-field">
+							<input id="password" @bind-value="request.Password" class="form-control" type="password" />
+							<ValidationMessage For="@(() => request.Password)" />
+						</div>
+						<label for="confirmPassword">Confirm New Password</label>
+						<div class="mb-3 input-field">
+							<input id="confirmPassword" @bind-value="request.ConfirmPassword" class="form-control" type="password" />
+							<ValidationMessage For="@(() => request.ConfirmPassword)" />
+						</div>
+						<button type="submit" class="btn btn-primary">Apply</button>
+					</EditForm>
+				}
+				else
+				{
+					<h5>Write your current Password</h5>
+					<EditForm Model="current" OnValidSubmit="SecurityPasswordChange">
+						<DataAnnotationsValidator></DataAnnotationsValidator>
+						<label for="password">Current Password</label>
+						<div class="mb-3 input-field">
+							<input id="password" @bind-value="current.Password" class="form-control" type="password" />
+							<ValidationMessage For="@(() => current.Password)" />
+						</div>
+						<label for="confirmPassword">Confirm Current Password</label>
+						<div class="mb-3 input-field">
+							<input id="confirmPassword" @bind-value="current.ConfirmPassword" class="form-control" type="password" />
+							<ValidationMessage For="@(() => current.ConfirmPassword)" />
+						</div>
+						<button type="submit" class="btn btn-primary">Confirm current password</button>
+					</EditForm>
+				}
+			}
+			<br />
+			<span class="@messageCssClass">@message</span>
+		</div>
+	</div>
+</div>
+
+@code {
+	UserChangePassword request = new UserChangePassword();
+	UserPasswordSecure current = new UserPasswordSecure();
+	UserChange userChange = new UserChange();
+	string message = string.Empty;
+	string messageCssClass = string.Empty;
+	bool changePasswordButton = false;
+	bool changePasswordWall = false;
+	string lockCss = "oi oi-lock-locked";
+
+	protected override async Task OnInitializedAsync()
+	{
+		await LanguageService.GetLanguages();
+		userChange = await AuthService.GetUserProfile();
+	}
+
+	async Task HandleFileSelected(InputFileChangeEventArgs inputFileChangeEvent)
+	{
+		var file = inputFileChangeEvent.File;
+		string fileType = inputFileChangeEvent.File.ContentType;
+		if (file != null)
+		{
+			var buffer = new byte[file.Size];
+			await file.OpenReadStream(50999282).ReadAsync(buffer);
+
+			userChange.ProfilePic = $"data:{fileType};base64,{Convert.ToBase64String(buffer)}";
+		}
+	}
+
+	private async Task SecurityPasswordChange()
+	{
+		var result = await AuthService.SecurityPasswordChange(current);
+		changePasswordWall = result.Data;
+		message = result.Message;
+	}
+
+	void NewPassword()
+	{
+		changePasswordButton = !changePasswordButton;
+		if (changePasswordButton)
+		{
+			lockCss = "oi oi-lock-unlocked";
+		}
+		else
+		{
+			lockCss = "oi oi-lock-locked";
+		}
+	}
+
+	void RemoveLanguage(int languageId)
+	{
+		var language = userChange.UserLanguages.Find(l => l.LanguageId == languageId);
+		if (language == null)
+		{
+			return;
+		}
+
+		userChange.UserLanguages.Remove(language);
+	}
+
+	void AddLanguage()
+	{
+		userChange.UserLanguages.Add(new UserLanguage { });
+	}
+
+	private async Task ChangeUserProfile()
+	{
+		var result = await AuthService.ChangeUserProfile(userChange);
+		message = result.Message;	
+		if (result.Success)
+			messageCssClass = "text-primary";
+		else
+			messageCssClass = "text-danger";
+	}
+
+	private async Task ChangePassword()
+	{
+		var result = await AuthService.ChangePassword(request);
+		message = result.Message;
+	}
+}

@@ -1,0 +1,117 @@
+﻿@page "/"
+@inject ITeacherService TeacherService
+@inject IInterestService InterestService
+@inject NavigationManager NavigationManager
+
+<PageTitle>HomePage</PageTitle>
+
+<div class="home">
+    <nav>
+        <div class="auth">
+            <AuthorizeView>
+                <NotAuthorized>
+                      <button class="Login" @onclick="GoToLogin">Log In</button>
+                      <button class="signup" @onclick="GoToSignUp">Sign Up</button>
+                </NotAuthorized>
+            </AuthorizeView>
+        </div>
+        <a class="logo" href="">EasyLearn</a>
+
+        <div class="nav-menu">
+          <ul>
+            <li><a class="nav-home" href="">Home</a></li>
+            <li><a href="users/1">Users</a></li>
+            <li><a href="students/1">Students</a></li>
+            <li><a href="teachers/1">Teachers</a></li>
+            <li><a href="posts/1">Posts</a></li>
+          </ul>
+        </div>
+        <AuthorizeView>
+            <Authorized>
+                <div class="user-button">
+                    <UserButton />
+                </div>
+                <div class="user-button">
+                    <ChatsButton />
+                </div>
+            </Authorized>
+        </AuthorizeView>
+
+    </nav>
+
+    <div class="content">
+        <h1>Find Your Desired Teacher with the click of a button</h1>
+    </div>
+
+    <div class="carousel">
+        <MudCarousel Style="height:400px; width: 1200px;" ShowArrows="true" ShowBullets="true" AutoCycle="true" TData="object">
+            <MudCarouselItem Transition="Transition.Slide">
+                <div class="d-flex" style="height:100%">
+                    <img src="./Banner3.png" style="width: 100%;" />
+                </div>
+            </MudCarouselItem>
+            <MudCarouselItem Transition="Transition.Slide">
+                <div class="d-flex" style="height:100%">
+                    <img src="./Banner5.jpeg" style="width: 100%;" />
+                </div>
+            </MudCarouselItem>
+        </MudCarousel>
+    </div>
+
+
+    <div class="container">
+        <p>Our Teachers</p>
+        <div class="post">
+            @if(TeacherService.Teachers != null && TeacherService.Teachers.Count > 0)
+            {
+                @foreach (var teacher in TeacherService.Teachers)
+                {
+                    <div class="contents">
+                        <div class="post-details">
+                            <img class="teacher-image" src="@teacher.ProfilePic">
+                        </div>
+
+                        <h2 class="post-title">@teacher.FirstName @teacher.LastName</h2>
+
+                        <p class="excerpt">
+                            Interests: 
+                            @if(teacherInterests != null && teacherInterests.Count > 0)
+                            {
+                                @foreach (var teacherInterest in teacherInterests.Where(ti => ti.TeacherId == teacher.Id))
+                                {
+                                    <span>@(InterestService.Interests.Find(i => i.Id == teacherInterest.InterestId).Name) &nbsp</span>
+                                }
+                            }
+                        </p>
+                    </div>
+                }
+            }
+        </div>
+    </div>
+    <div class="sign-up-now">
+        <button class="Login m-0" @onclick="GoToSignUp">Sign Up Now!</button>
+    </div>
+</div>
+
+@code {
+
+    List<TeacherInterest> teacherInterests = new List<TeacherInterest>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await TeacherService.RandomTeachers(3);
+        teacherInterests = await TeacherService.GetAllTeacherInterests();
+        await InterestService.GetInterests();
+    }
+
+
+    void GoToLogin()
+    {
+        NavigationManager.NavigateTo("login");
+    }
+
+    void GoToSignUp()
+    {
+        NavigationManager.NavigateTo("signup");
+    }
+}

@@ -1,0 +1,109 @@
+﻿@page "/admin/proposals/{page:int}"
+@page "/admin/proposals/search/{searchText}/{page:int}"
+@inject IProposalService ProposalService
+@inject IPostService PostService
+@implements IDisposable
+
+<PageTitle>Proposals</PageTitle>
+
+<SearchProposals />
+
+@if (ProposalService.AdminProposals == null || ProposalService.AdminProposals.Count == 0)
+{
+	<span>Loading...</span>
+}
+else
+{
+	<ul class="list-unstyled">
+		@if(ProposalService.AdminProposals != null && ProposalService.AdminProposals.Count != 0 && authorsProfilePics != null && authorsProfilePics.Count != 0 && authors != null && authors.Count != 0)
+		{
+			@foreach (var proposal in ProposalService.AdminProposals)
+			{
+				<li>
+					<div class="container">
+						<div class="proposal">
+							<div class="proposal-details">
+
+								<img src="@authorsProfilePics.FirstOrDefault(a => a.Key == proposal.Id).Value">
+
+								<div class="icon-text">
+									<h2><a class="proposal-author" href="/teacher_profile/@proposal.TeacherId">@authors.FirstOrDefault(a => a.Key == proposal.Id).Value</a></h2>
+								</div>
+							</div>
+
+							<h2>
+								<a class="proposal-author" href="/Proposal/@proposal.PostId/@proposal.Id">@fullNames.FirstOrDefault(fn => fn.Key == proposal.Id).Value on the Post: @postTitles.FirstOrDefault(pt => pt.Key == proposal.Id).Value</a>
+							</h2>
+
+							<p>
+								@proposal.Description
+							</p>
+
+							<div class="proposal-cta">
+								Budget: @proposal.Budget$/1hr
+							</div>
+						</div>
+					</div>
+					<hr />
+				</li>
+			}
+		}
+	</ul>
+	for (var i = 1; i <= Math.Ceiling((double)adminProposalsCount/5); i++)
+	{
+		<a class="btn @(i == Page ? "btn-info" : "btn-outline-info") page-selection"
+					href=@((SearchText == null || SearchText.Equals("")) ? $"/admin/proposals/{i}" : $"/admin/proposals/search/{SearchText}/{i}")>@i</a>
+	}
+}
+
+@code {
+	[Parameter]
+	public int Page { get; set; } = 1;
+
+	[Parameter]
+	public string? SearchText { get; set; } = null;
+
+	private int adminProposalsCount = 0;
+	Dictionary<int, string> fullNames = new Dictionary<int, string>();
+	Dictionary<int, string> postTitles = new Dictionary<int, string>();
+	Dictionary<int, string> authorsProfilePics = new Dictionary<int, string>();
+	Dictionary<int, string> authors = new Dictionary<int, string>();
+
+	protected override async Task OnInitializedAsync()
+	{
+		adminProposalsCount = await ProposalService.AdminGetProposalsCount();
+		authorsProfilePics = await ProposalService.GetProposalsAuthorsProfilePics();
+		authors = await ProposalService.GetProposalsAuthors();
+		ProposalService.ProposalsChanged += StateHasChanged;
+	}
+
+	public void Dispose()
+	{
+		ProposalService.ProposalsChanged -= StateHasChanged;
+	}
+
+	protected override async Task OnParametersSetAsync()
+	{
+		if (SearchText == null || SearchText.Equals(""))
+		{
+			await ProposalService.AdminGetProposalsPaginated(Page);
+			adminProposalsCount = await ProposalService.AdminGetProposalsCount();
+		}
+		else
+		{
+			await ProposalService.SearchProposals(SearchText, Page);
+			adminProposalsCount = await ProposalService.SearchProposalsCount(SearchText);
+		}
+		if(ProposalService.AdminProposals != null && ProposalService.AdminProposals.Count != 0)
+		{
+			foreach (var proposal in ProposalService.AdminProposals)
+			{
+				if (!fullNames.ContainsKey(proposal.Id))
+					fullNames.Add(proposal.Id, await ProposalService.GetTeacherName(proposal.TeacherId));
+			
+				if(!postTitles.ContainsKey(proposal.Id))
+					postTitles.Add(proposal.Id, await PostService.AdminGetPostTitle(proposal.PostId));
+			}
+		}
+	}
+}

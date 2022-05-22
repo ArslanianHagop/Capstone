@@ -1,0 +1,153 @@
+﻿@page "/student_profile/{studentId:int}/{page:int}"
+@inject IStudentService StudentService
+@inject ILanguageService LanguageService
+@inject IInterestService InterestService
+@inject IPostService PostService
+@inject NavigationManager NavigationManager
+@attribute [Authorize]
+
+<PageTitle>Student Profile</PageTitle>
+
+@if(student == null)
+{
+	<span>@message</span>
+}
+else
+{
+	<h2>@student.FirstName @student.LastName</h2>
+	<AuthorizeView>
+		<Authorized>
+			<a class="toMessage" href="/message/@StudentId">Message @student.FirstName @student.LastName</a>
+		</Authorized>
+		<NotAuthorized>
+			<span>To message @student.FirstName @student.LastName <a class="toMessage" href="login?returnUrl=@NavigationManager.ToBaseRelativePath(NavigationManager.Uri)">login</a></span>
+		</NotAuthorized>
+	</AuthorizeView>
+	<br />
+	<img src="@student.ProfilePic" style="width: 250px; height: 250px;" /> <br />
+	<h3>Languages</h3>
+	@if(studentsLanguages != null && studentsLanguages.Count > 0)
+	{
+		@foreach (var studentLanguage in studentsLanguages)
+		{
+			<div class="mb-3">
+				@foreach (var language in LanguageService.Languages)
+				{
+					if(studentLanguage.LanguageId == language.Id)
+					{
+						<span>@language.Name</span>
+					}
+				}
+			</div>
+		}
+	}
+
+	<h3>Interests</h3>
+	@if(studentsInterests != null && studentsInterests.Count > 0)
+	{
+		@foreach (var studentInterest in studentsInterests)
+		{
+			<div class="mb-3">
+				@foreach (var interest in InterestService.Interests)
+				{
+					if(studentInterest.InterestId == interest.Id)
+					{
+						<span>@interest.Name</span>
+					}
+				}
+			</div>
+		}
+	}
+
+	<table class="table">
+		<thead>
+			<tr>
+				<th>Post Title</th>
+				<th>Course type</th>
+				<th>Budget</th>
+				<th></th>
+			</tr>
+		</thead>
+		<tbody>
+			@if(posts != null && posts.Count > 0)
+			{
+				<Virtualize Items="posts" Context="post">
+					<tr>
+						<td>@post.Title</td>
+						<td>
+							@if(postInterests != null && postInterests.Count > 0)
+							{
+								@foreach (var postInterest in postInterests.Where(pi => pi.PostId == post.Id))
+								{
+									<span>@InterestService.Interests.Find(i => i.Id == postInterest.InterestId).Name</span>
+									<br />
+								}
+							}
+						</td>
+						<td>@post.Budget$/1hr</td>
+						<td><a class="btn btn-primary" href="/post/@post.Id">Details</a></td>
+					</tr>
+				</Virtualize>
+			}
+		</tbody>
+	</table>
+
+	<div class="float-end">
+		@for (var i = 1; i <= Math.Ceiling((double)postsCount / 5); i++)
+		{
+			<a class="btn @(i == Page ? "btn-info" : "btn-outline-info") page-selection"
+						href=@($"/student_profile/{StudentId}/{i}")>@i</a>
+		}
+	</div>
+
+	<hr />
+	<h5>Joined on @student.DateCreated</h5>
+}
+
+@code {
+	[Parameter]
+	public int StudentId { get; set; }
+
+	[Parameter]
+	public int Page { get; set; } = 1;
+
+	private User student = null;
+	private string message = string.Empty;
+	List<PostInterest> postInterests = new List<PostInterest>();
+	List<Post> posts = new List<Post>();
+	int postsCount = 0;
+	List<UserLanguage> studentsLanguages = new List<UserLanguage>();
+	List<StudentInterest> studentsInterests = new List<StudentInterest>();
+
+	protected override async Task OnParametersSetAsync()
+	{
+		postInterests = await PostService.GetAllPostInterests();
+		postsCount = await PostService.GetStudentsPostsCount(StudentId);
+		posts = await PostService.GetStudentsPostsPaginated(StudentId, Page);
+		message = "Loading Student Profile";
+
+		var result = await StudentService.GetStudent(StudentId);
+
+		if (!result.Success)
+		{
+			message = result.Message;
+		}
+		else
+		{
+			student = result.Data;
+		}
+
+		await LanguageService.GetLanguages();
+		await InterestService.GetInterests();
+		studentsLanguages = await StudentService.GetStudentsLanguages(StudentId);
+		if(studentsLanguages == null || studentsLanguages.Count == 0)
+		{
+			studentsLanguages = new List<UserLanguage>();
+		}
+		studentsInterests = await StudentService.GetStudentsInterests(StudentId);
+		if(studentsInterests == null || studentsInterests.Count == 0)
+		{
+			studentsInterests = new List<StudentInterest>();
+		}
+	}
+}

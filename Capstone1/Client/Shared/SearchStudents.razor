@@ -1,0 +1,61 @@
+﻿@inject NavigationManager NavigationManager
+@inject IStudentService StudentService
+
+<div class="input-group">
+	<input  @bind-value="searchText"
+			@bind-value:event="oninput"
+			type="search"
+			list="students"
+			@onkeyup="HandleSearch"
+			class="form-control"
+			placeholder="Search Students..."
+			@ref="searchInput" />
+	<datalist id="students">
+		@foreach (var suggestion in suggestions)
+		{
+			<option>@suggestion</option>
+		}
+	</datalist>
+	<div class="input-group-append">
+		<button class="btn btn-primary" @onclick="SearchStudent">
+			<span class="oi oi-magnifying-glass"></span>
+		</button>
+	</div>
+</div>
+
+@code {
+	private string searchText = string.Empty;
+	private List<string> suggestions = new List<string>();
+	protected ElementReference searchInput;
+
+	protected override async Task OnAfterRenderAsync(bool firstRender)
+	{
+		if (firstRender)
+		{
+			await searchInput.FocusAsync();
+		}
+	}
+
+	public void SearchStudent()
+	{
+		if (searchText.Equals(string.Empty))
+		{
+			NavigationManager.NavigateTo("students/1");
+		}
+		else
+		{
+			NavigationManager.NavigateTo($"students/search/{searchText}/1");
+		}
+	}
+
+	public async Task HandleSearch(KeyboardEventArgs args)
+	{
+		if(args.Key == null || args.Key.Equals("Enter"))
+		{
+			SearchStudent();
+		}else if(searchText.Length > 1)
+		{
+			suggestions = await StudentService.GetStudentSearchSuggestions(searchText);
+		}
+	}
+}

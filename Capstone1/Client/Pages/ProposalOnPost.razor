@@ -1,0 +1,166 @@
+﻿@page "/Proposal/{postid:int}"
+@page "/Proposal/{postid:int}/{proposalid:int}"
+@inject IPostService PostService
+@inject IProposalService ProposalService
+@inject IAuthService AuthService
+@inject IStudentService StudentService
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
+@attribute [Authorize(Roles = "Admin,Teacher")]
+
+<PageTitle>Proposal on Post</PageTitle>
+
+@if(proposal.TeacherId == currentUserId || isAdmin || (proposal.IsNew && !isStudent))
+{
+	@if (proposal != null && proposal.IsAccepted)
+	{
+		@if (isAdmin)
+		{
+			<h3>This proposal on the post "@post.Title" has been accepted</h3>
+		}
+		else
+		{
+			<h3>Your proposal on the post "@post.Title" has been accepted</h3>
+		}
+	}
+	else
+	{
+		@if (updateOtherTeacherProposal)
+		{
+			@if (loading)
+			{
+				<span>@message</span>
+			}
+			else
+			{
+				<h3>This Post belongs to @fullName</h3>
+				@if (proposal.Editing)
+				{
+					<h4>Edit your proposal on Post: @post.Title</h4>
+				}
+				else if (proposal.IsNew)
+				{
+					<h4>Make your proposal on Post: @post.Title</h4>
+				}
+			}
+
+			<h5>This posts description</h5>
+			<p>@post.Description</p>
+
+			<hr />
+
+			<EditForm Model="proposal" OnValidSubmit="AddOrUpdateProposal">
+				<DataAnnotationsValidator></DataAnnotationsValidator>
+				<div class="mb-3">
+					<span style="font-weight: bold">@applyText</span>
+				</div>
+				<div class="mb-0">
+					<label for="description">Description</label>
+					<InputTextArea id="description" @bind-Value="proposal.Description" class="form-control"></InputTextArea>
+				</div>
+				<div class="mb-0">
+					<label for="budget">What you cost an hour</label>
+					<InputNumber @bind-Value="proposal.Budget" class="form-control"></InputNumber>
+				</div>
+				<br />
+				@if (isAdmin)
+				{
+					<div class="col col-visible">
+						Visibility&emsp;<InputCheckbox @bind-Value="proposal.Visible" style="transform:scale(1.5, 1.5);"></InputCheckbox>
+					</div>
+					<br />
+				}
+
+				<button type="submit" class="btn btn-primary float-end">@applyText</button>
+				<ValidationSummary></ValidationSummary>
+			</EditForm>
+
+			@if(!proposal.IsNew)
+			{
+				<button type="button" class="btn btn-danger float-start" @onclick="DeleteProposal">
+					Delete Proposal
+				</button>
+			}
+		}
+	}
+}
+
+
+
+
+@code {
+	[Parameter]
+	public int PostId { get; set; } = 0;
+
+	[Parameter]
+	public int ProposalId { get; set; } = 0;
+
+	Post post = new Post();
+	string fullName = string.Empty;
+	Proposal proposal = new Proposal();
+	bool loading = true;
+	string message = "Loading...";
+	string applyText = "";
+	int currentUserId = 0;
+	bool updateOtherTeacherProposal = true;
+	bool isAdmin = false;
+	bool isStudent = true;
+
+	protected override async Task OnParametersSetAsync()
+	{
+		currentUserId = await AuthService.GetCurrentUserId();
+		isAdmin = await AuthService.IsAdmin();
+		isStudent = await StudentService.StudentRoleCheck();
+		post = (await PostService.GetPost(PostId)).Data;
+		fullName = await PostService.GetNameOfPoster(post.StudentId);
+
+		if(ProposalId == 0)
+		{
+			proposal = new Proposal { IsNew = true };
+			applyText = "Make your proposal";
+		}
+		else
+		{
+			Proposal dbProposal = (await ProposalService.GetProposal(ProposalId)).Data;
+			if(dbProposal == null)
+			{
+				message = $"Proposal with id '{ProposalId}' does not exist.";
+				return;
+			}
+
+			proposal = dbProposal;
+			proposal.Editing = true;
+			applyText = "Update your Proposal";
+			if (proposal.TeacherId != currentUserId && !isAdmin)
+				updateOtherTeacherProposal = false;
+		}
+		loading = false;
+	}
+
+	async void AddOrUpdateProposal()
+	{
+		if (proposal.IsNew)
+		{
+			proposal.PostId = PostId;
+			var result = await ProposalService.AddProposal(proposal);
+			NavigationManager.NavigateTo($"Proposal/{PostId}/{result.Id}");
+		}
+		else
+		{
+			proposal.IsNew = false;
+			proposal = await ProposalService.UpdateProposal(proposal);
+			NavigationManager.NavigateTo($"Proposal/{PostId}/{proposal.Id}", true);
+		}
+	}
+
+	async void DeleteProposal()
+	{
+		bool confirmed = await JSRuntime.InvokeAsync<bool>("confirm",
+		$"Do you really want to delete your proposal on the post : '{post.Title}'?");
+		if (confirmed)
+		{
+			await ProposalService.DeleteProposal(proposal.Id);
+			NavigationManager.NavigateTo("profile/teacher/1");
+		}
+	}
+}

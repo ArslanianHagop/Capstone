@@ -1,0 +1,110 @@
+﻿@page "/login"
+@using Microsoft.AspNetCore.WebUtilities
+@inject IAuthService AuthService
+@inject ILocalStorageService LocalStorage
+@inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+
+<PageTitle>Login</PageTitle>
+
+@if (authCheck)
+{
+	<h3>You can't login, you are already logged in!!!</h3>
+}
+else
+{
+	<div class="easyLearn float-end">
+        <a href="">EasyLearn</a>
+    </div>
+
+	<div class="container">
+		<div class="forms-container">
+			<div class="signin">
+				<div class="myForm">
+					<EditForm Model="user" OnValidSubmit="HandleLogin">
+						<DataAnnotationsValidator />
+						<h2 class="title">Sign in</h2>
+						<div class="input-field">
+							<i class="oi oi-person"></i>
+							<input id="email" @bind-value="user.Email" placeholder="Email" />
+							<p class="validationMessage"><ValidationMessage For="@(() => user.Email)" /></p>
+						</div>
+						<br />
+						<div class="input-field">
+							<i class="oi oi-lock-locked"></i>
+							<input id="password" @bind-value="user.Password" placeholder="Password" type="password" />
+							<p class="validationMessage"><ValidationMessage For="@(() => user.Password)" /></p>
+						</div>
+						<br />
+						<button type="submit" class="btn solid">Login</button>
+						<div class="text-danger">
+							<span>@errorMessage</span>
+						</div>
+					</EditForm>
+				</div>
+			</div>
+		</div>
+	</div>
+	<div class="leftContainer"></div>
+	<div class="panels-container">
+		<div class="panel left-panel">
+			<div class="content">
+				<h3>New here ?</h3>
+				<p>
+					Sign up for 1:1 teaching sessions.
+				</p>
+				<button @onclick="GoToSignUp" class="btn transparent" id="sign-up-btn">
+					Sign up
+				</button>
+			</div>
+			<br />
+			<img src="/css/undraw_online_learning_re_qw08.svg" class="image" alt="" />
+		</div>
+	</div>
+}
+
+@code {
+	private UserLogin user = new UserLogin();
+
+	private string errorMessage = string.Empty;
+
+	private string returnUrl = string.Empty;
+
+	private bool authCheck = false;
+
+	protected override async void OnInitialized()
+	{
+		var uri = NavigationManager.ToAbsoluteUri(NavigationManager.Uri);
+		if (QueryHelpers.ParseQuery(uri.Query).TryGetValue("returnUrl", out var url))
+		{
+			returnUrl = url;
+		}
+
+		string authToken = await LocalStorage.GetItemAsStringAsync("authToken");
+		if (!string.IsNullOrEmpty(authToken))
+			authCheck = true;
+	}
+
+	private async Task HandleLogin()
+	{
+		var result = await AuthService.Login(user);
+		if (result.Success)
+		{
+			errorMessage = string.Empty;
+
+			await LocalStorage.SetItemAsync("authToken", result.Data);
+			await AuthenticationStateProvider.GetAuthenticationStateAsync();
+			NavigationManager.NavigateTo(returnUrl);
+		}
+		else
+		{
+			errorMessage = result.Message;
+		}
+	}
+
+	private void GoToSignUp()
+	{
+		NavigationManager.NavigateTo("signup");
+	}
+}

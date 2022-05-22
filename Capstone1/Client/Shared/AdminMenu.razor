@@ -1,0 +1,26 @@
+﻿@inject AuthenticationStateProvider AuthStateProvider
+@using System.Security.Claims
+
+@if (authorized)
+{
+	<a class="dropdown-item text-primary" href="admin/interests">Interests</a>
+	<a class="dropdown-item text-primary" href="admin/languages">Languages</a>
+	<a class="dropdown-item text-primary" href="admin/users/1">Users</a>
+	<a class="dropdown-item text-primary" href="admin/posts/1">Posts</a>
+	<a class="dropdown-item text-primary" href="admin/proposals/1">Proposals</a>
+	<hr />
+}
+
+@code {
+	bool authorized = false;
+
+	protected override async Task OnInitializedAsync()
+	{
+		string role = (await AuthStateProvider.GetAuthenticationStateAsync())
+		.User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Role).Value;
+		if (role.Contains("Admin"))
+		{
+			authorized = true;
+		}
+	}
+}

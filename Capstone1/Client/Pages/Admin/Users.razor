@@ -1,0 +1,72 @@
+﻿@page "/admin/users/{page:int}"
+@page "/admin/users/search/{searchText}/{page:int}"
+@inject IAuthService AuthService
+@attribute [Authorize(Roles = "Admin")]
+
+<PageTitle>Admin users</PageTitle>
+
+@if(AuthService.AdminUsers != null && AuthService.AdminUsers.Count != 0)
+{
+	<SearchAdminUsers />
+	<br />
+	<div class="header">
+		<div class="col">Name</div>
+		<div class="col"></div>
+	</div>
+
+	@foreach (var user in AuthService.AdminUsers)
+	{
+		<div class="row">
+			<div class="col">
+				<a href=@(user.Role.Equals("Student") ? $"/admin/edit/student/{user.Id}/1" : $"/admin/edit/teacher/{user.Id}/1")>@user.FirstName @user.LastName</a>
+			</div>
+			<div class="col">
+				<button class="btn btn-primary" @onclick="(() => DeleteUser(user.Id))">
+					<i class="oi oi-trash"></i>
+				</button>
+			</div>
+		</div>
+	}
+
+	for (var i = 1; i <= AuthService.PageCount; i++)
+	{
+		<a class="btn @(i == AuthService.CurrentPage ? "btn-info" : "btn-outline-info") page-selection"
+					href=@((SearchText == null || SearchText.Equals("")) ? $"/admin/users/{i}" : $"/admin/users/search/{SearchText}/{i}")>@i</a>
+	}
+}
+
+@code {
+
+	[Parameter]
+	public int Page { get; set; } = 1;
+
+	[Parameter]
+	public string? SearchText { get; set; } = null;
+
+	protected override async Task OnInitializedAsync()
+	{
+		AuthService.UsersChanged += StateHasChanged;
+	}
+
+	protected override async Task OnParametersSetAsync()
+	{
+		if(SearchText == null || SearchText.Equals(""))
+		{
+			await AuthService.GetAdminUsersPaginated(Page);
+		}
+		else
+		{
+			await AuthService.SearchAdminUsers(SearchText, Page);
+		}
+	}
+
+	public void Dispose()
+	{
+		AuthService.UsersChanged -= StateHasChanged;
+	}
+
+	private async Task DeleteUser(int id)
+	{
+		await AuthService.DeleteUser(id, Page);
+	}
+}

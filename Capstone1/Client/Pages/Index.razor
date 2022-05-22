@@ -1,0 +1,129 @@
+﻿@page "/posts/search/{searchText}/{page:int}"
+@page "/posts/search/{searchText}/{page:int}/highest_budget_sorted/{HighestBudgetSorted:bool}"
+@page "/posts/search/{searchText}/{page:int}/newest_sorted/{NewestSorted:bool}"
+@page "/posts/{page:int}"
+@page "/posts/{page:int}/highest_budget_sorted/{HighestBudgetSorted:bool}"
+@page "/posts/{page:int}/newest_sorted/{NewestSorted:bool}"
+@inject IPostService PostService
+
+<PageTitle>Home</PageTitle>
+
+<PostCards />
+
+@code {
+	[Parameter]
+	public string? SearchText { get; set; } = null;
+
+	[Parameter]
+	public int Page { get; set; } = 1;
+
+	[Parameter]
+	public bool HighestBudgetSorted { get; set; } = false;
+
+	[Parameter]
+	public bool NewestSorted { get; set; } = false;
+
+	protected override async Task OnParametersSetAsync()
+	{
+		if (SearchText != null)
+		{
+			if (PostService.FilteredPosts != null && PostService.FilteredPosts.Count > 0)
+			{
+				PostService.PostsPaged = await PostService.SearchPostsReturn(SearchText, Page, PostService.FilteredPosts);
+				if(HighestBudgetSorted)
+				{
+					PostService.PostsPaged = (from n in PostService.PostsPaged
+													orderby n.Budget descending
+													select n).ToList();
+				}
+				else if (NewestSorted)
+				{
+					PostService.PostsPaged = (from n in PostService.PostsPaged
+													orderby n.DateCreated descending
+													select n).ToList();
+				}
+				await PostService.PostsChangedInvoked();
+			}
+			else
+			{
+				await PostService.GetPosts();
+				if (HighestBudgetSorted)
+				{	
+					PostService.Posts = (from n in PostService.Posts
+											orderby n.Budget descending
+											select n).ToList();
+				}
+				else if (NewestSorted)
+				{
+					PostService.Posts = (from n in PostService.PostsPaged
+											orderby n.DateCreated descending
+											select n).ToList();
+				}
+				await PostService.SearchPosts(SearchText, Page, PostService.Posts);
+				if (HighestBudgetSorted)
+				{	
+					PostService.Posts = (from n in PostService.Posts
+											orderby n.Budget descending
+											select n).ToList();
+				}
+				else if (NewestSorted)
+				{
+					PostService.Posts = (from n in PostService.PostsPaged
+											orderby n.DateCreated descending
+											select n).ToList();
+				}
+				await PostService.PostsChangedInvoked();
+			}
+		}
+		else
+		{
+			if(PostService.FilteredPosts != null && PostService.FilteredPosts.Count > 0)
+			{
+				if(HighestBudgetSorted)
+				{
+					PostService.FilteredPosts = (from n in PostService.FilteredPosts
+													orderby n.Budget descending
+													select n).ToList();
+				}
+				else if (NewestSorted)
+				{
+					PostService.FilteredPosts = (from n in PostService.FilteredPosts
+													orderby n.DateCreated descending
+													select n).ToList();
+				}
+				else
+				{
+					PostService.FilteredPosts = (from n in PostService.FilteredPosts
+													orderby n.Title ascending
+													select n).ToList();
+				}
+				PostService.PostsPaged = PostService.FilteredPosts.Skip((Page - 1) * 5).Take(5).ToList();
+				await PostService.PostsChangedInvoked();
+				PostService.CurrentPage = Page;
+			}
+			else
+			{
+				if (HighestBudgetSorted)
+				{
+					List<Post> filterPosts = await PostService.GetAllPosts();
+					filterPosts = (from n in filterPosts
+											orderby n.Budget descending
+											select n).ToList();
+					await PostService.GetPostsPagination(Page, filterPosts);
+				}
+				else if (NewestSorted)
+				{
+					List<Post> filterPosts = await PostService.GetAllPosts();
+					filterPosts = (from n in filterPosts
+											orderby n.DateCreated descending
+											select n).ToList();
+					await PostService.GetPostsPagination(Page, filterPosts);
+				}
+				else
+				{
+					await PostService.GetPostsPagination(Page, await PostService.GetAllPosts());
+				}
+			}
+		}
+	}
+}
